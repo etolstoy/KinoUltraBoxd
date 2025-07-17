@@ -1,16 +1,68 @@
 import { parseKinopoiskIdsFromHtmlFiles } from './htmlParsingService';
 import { FilmData } from './models/FilmData';
 import { attachImdbIds } from './localImdbService';
+import { attachTmdbIds } from './wikiDataService';
+
+// Helper type representing any enrichment function (sync or async)
+type EnrichFn = (films: FilmData[]) => Promise<FilmData[]> | FilmData[];
 
 /**
- * Stub function to process a list of HTML file contents into film data models.
- * @param htmlFiles Array of HTML file contents as strings
- * @returns Array of FilmData (currently always empty)
+ * Runs a single enrichment stage:
+ *   1. Picks films that still lack BOTH imdbId and tmdbId.
+ *   2. Passes them to the given enrichment function.
+ *   3. Merges the returned films back into the map.
  */
-export function process(htmlFiles: string[]): FilmData[] {
-  console.log('process');
+async function enrichStage(
+  stageName: string,
+  filmMap: Map<number, FilmData>,
+  enrichFn: EnrichFn,
+): Promise<void> {
+  const needEnrichment = [...filmMap.values()].filter(
+    (f) => f.imdbId == null && f.tmdbId == null,
+  );
+
+  console.log(`[filmProcessingService] ${stageName}: ${needEnrichment.length} film(s) need enrichment`);
+
+  if (needEnrichment.length === 0) return;
+
+  const enriched = await Promise.resolve(enrichFn(needEnrichment));
+
+  // Count how many actually received a new identifier.
+  const newlyEnriched = enriched.filter(
+    (f) => f.imdbId != null || f.tmdbId != null,
+  ).length;
+
+  console.log(`[filmProcessingService] ${stageName}: ${newlyEnriched} film(s) enriched`);
+
+  enriched.forEach((f) => filmMap.set(f.kinopoiskId, f));
+}
+
+/**
+ * Converts Kinopoisk HTML pages to fully-enriched FilmData objects.
+ *
+ * Each enrichment phase (IMDb first, TMDB second) receives **only** those
+ * films that still lack both identifiers. This minimises external look-ups
+ * and keeps every stage focused on what it can actually enrich.
+ *
+ * The function does not mutate its input – it works with shallow copies and
+ * returns a brand-new array.
+ */
+export async function process(htmlFiles: string[]): Promise<FilmData[]> {
+  // ---------- 1. Parse Kinopoisk pages ----------
   const parsedFilms = parseKinopoiskIdsFromHtmlFiles(htmlFiles);
-  console.log('Extracted entries:', parsedFilms);
-  const filmsWithImdb = attachImdbIds(parsedFilms);
-  return filmsWithImdb;
+
+  // Use a map keyed by kinopoiskId, so we can merge enriched results back in.
+  const filmMap = new Map<number, FilmData>(
+    parsedFilms.map((f) => [f.kinopoiskId, { ...f }]),
+  );
+
+  // ---------- 2. IMDb enrichment ----------
+  await enrichStage('IMDb enrichment', filmMap, (films) => attachImdbIds(films));
+
+  // ---------- 3. TMDB enrichment ----------
+  await enrichStage('TMDB enrichment', filmMap, attachTmdbIds);
+
+  const finalFilms = [...filmMap.values()];
+  console.log('[filmProcessingService] Final enriched films:', finalFilms);
+  return finalFilms;
 } 

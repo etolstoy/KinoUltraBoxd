@@ -72,7 +72,13 @@ bot.hears(/^go$/i, async (ctx: Context) => {
   }
 
   // Call the film processing service with all HTML contents
-  processFilms(htmlContents);
+  try {
+    const films = await processFilms(htmlContents);
+    await ctx.reply(`✅ Processed ${films.length} entries.`);
+  } catch (err) {
+    console.error('[bot] film processing failed', err);
+    await ctx.reply('❌ Failed to process films. Please try again later.');
+  }
 
   // Clear the queue after processing
   userFileQueue[userId] = { file_ids: [], file_names: [] };
