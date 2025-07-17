@@ -13,6 +13,7 @@ describe('htmlParsingService', () => {
   });
 
   it('should extract 9 films from ideal.html', () => {
+    console.log('entries', entries);
     expect(Array.isArray(entries)).toBe(true);
     expect(entries.length).toBe(9);
   });
