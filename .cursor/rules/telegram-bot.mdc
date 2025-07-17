@@ -1,0 +1,10 @@
+---
+alwaysApply: true
+---
+- Use the telegraf package for working with Telegram API
+- Support two operational modes: long polling for local development and webhook for deployment
+- Use emojis sparingly to enhance readability without being excessive
+- For long multi-step operations
+    - Display temporary status messages (e.g., "Getting information from OpenAI...")
+    - Remove these temporary messages once the step completes to keep the chat clean
+- When possible, update a single message progressively rather than sending multiple messages as each step completes

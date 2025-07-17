@@ -1,0 +1,5 @@
+---
+alwaysApply: true
+---
+- Organize all code into files with single responsibilities that are easy to test and maintain.
+- Store all sensitive information (tokens, keys, IDs) in the .env file.

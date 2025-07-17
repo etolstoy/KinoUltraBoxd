@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "dotenv": "^17.2.0",
+    "telegraf": "^4.16.3"
+  }
+}

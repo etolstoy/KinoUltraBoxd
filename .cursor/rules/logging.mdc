@@ -1,0 +1,4 @@
+---
+alwaysApply: true
+---
+Include appropriate but not excessive logging for critical operations and debugging purposes.
