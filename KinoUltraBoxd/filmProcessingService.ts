@@ -1,14 +1,5 @@
 import { parseKinopoiskIdsFromHtmlFiles } from './htmlParsingService';
-
-export interface FilmData {
-  title: string;
-  year: number | null;
-  rating: number | null;
-  watchDate: string | null;
-  kinopoiskId: number;
-  tmdbId: number | null;
-  imdbId: number | null;
-}
+import { FilmData } from './models/FilmData';
 
 /**
  * Stub function to process a list of HTML file contents into film data models.
@@ -17,8 +8,8 @@ export interface FilmData {
  */
 export function process(htmlFiles: string[]): FilmData[] {
   console.log('process');
-  const kinopoiskIds = parseKinopoiskIdsFromHtmlFiles(htmlFiles);
-  console.log('Extracted kinopoiskIds:', kinopoiskIds);
+  const parsedFilms = parseKinopoiskIdsFromHtmlFiles(htmlFiles);
+  console.log('Extracted entries:', parsedFilms);
   // TODO: Implement actual processing logic
   return [];
 } 
