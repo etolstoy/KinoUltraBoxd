@@ -2,9 +2,13 @@ import { parseKinopoiskIdsFromHtmlFiles } from './htmlParsingService';
 import { FilmData } from './models/FilmData';
 import { attachImdbIds } from './localImdbService';
 import { attachTmdbIds } from './wikiDataService';
+import { attachTmdbIdsViaSearch } from './tmdbSearchService';
 
 // Helper type representing any enrichment function (sync or async)
 type EnrichFn = (films: FilmData[]) => Promise<FilmData[]> | FilmData[];
+
+// Allows custom filtering for stages (e.g. only those missing tmdbId).
+type FilterFn = (film: FilmData) => boolean;
 
 /**
  * Runs a single enrichment stage:
@@ -16,10 +20,9 @@ async function enrichStage(
   stageName: string,
   filmMap: Map<number, FilmData>,
   enrichFn: EnrichFn,
+  filterFn: FilterFn = (f) => f.imdbId == null && f.tmdbId == null && f.type === 'film',
 ): Promise<void> {
-  const needEnrichment = [...filmMap.values()].filter(
-    (f) => f.imdbId == null && f.tmdbId == null,
-  );
+  const needEnrichment = [...filmMap.values()].filter(filterFn);
 
   console.log(`[filmProcessingService] ${stageName}: ${needEnrichment.length} film(s) need enrichment`);
 
@@ -59,8 +62,11 @@ export async function process(htmlFiles: string[]): Promise<FilmData[]> {
   // ---------- 2. IMDb enrichment ----------
   await enrichStage('IMDb enrichment', filmMap, (films) => attachImdbIds(films));
 
-  // ---------- 3. TMDB enrichment ----------
-  await enrichStage('TMDB enrichment', filmMap, attachTmdbIds);
+  // ---------- 3. TMDB enrichment (WikiData) ----------
+  await enrichStage('TMDB enrichment (WikiData)', filmMap, attachTmdbIds);
+
+  // ---------- 4. TMDB enrichment (Search API) ----------
+  await enrichStage('TMDB enrichment (TMDB Search)', filmMap, attachTmdbIdsViaSearch);
 
   const finalFilms = [...filmMap.values()];
   console.log('[filmProcessingService] Final enriched films:', finalFilms);
