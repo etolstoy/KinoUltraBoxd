@@ -36,6 +36,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const telegraf_1 = require("telegraf");
 const dotenv = __importStar(require("dotenv"));
 const https = __importStar(require("https"));
+const filmProcessingService_1 = require("./filmProcessingService");
 dotenv.config();
 const bot = new telegraf_1.Telegraf(process.env.BOT_TOKEN);
 bot.start((ctx) => ctx.reply('Hello'));
@@ -58,6 +59,7 @@ bot.on('document', async (ctx) => {
 });
 bot.hears(/^go$/i, async (ctx) => {
     const userId = ctx.from?.id;
+    console.log('gogogo');
     if (!userId)
         return;
     const queue = userFileQueue[userId];
@@ -66,6 +68,7 @@ bot.hears(/^go$/i, async (ctx) => {
         return;
     }
     await ctx.reply(`Processing ${queue.file_ids.length} file(s)...`);
+    const htmlContents = [];
     for (let i = 0; i < queue.file_ids.length; i++) {
         const file_id = queue.file_ids[i];
         const file_name = queue.file_names[i];
@@ -84,6 +87,7 @@ bot.hears(/^go$/i, async (ctx) => {
                     res.on('error', reject);
                 }).on('error', reject);
             });
+            htmlContents.push(data);
             const lines = data.split(/\r?\n/);
             const totalLines = lines.length;
             await ctx.reply(`File: ${file_name}\nTotal lines: ${totalLines}`);
@@ -92,6 +96,8 @@ bot.hears(/^go$/i, async (ctx) => {
             await ctx.reply(`❌ Error processing file: ${file_name}`);
         }
     }
+    // Call the film processing service with all HTML contents
+    (0, filmProcessingService_1.process)(htmlContents);
     // Clear the queue after processing
     userFileQueue[userId] = { file_ids: [], file_names: [] };
 });

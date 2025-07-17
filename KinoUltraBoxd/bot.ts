@@ -2,6 +2,7 @@ import { Telegraf, Context } from 'telegraf';
 import { Message } from 'telegraf/typings/core/types/typegram';
 import * as dotenv from 'dotenv';
 import * as https from 'https';
+import { process as processFilms } from './filmProcessingService';
 
 dotenv.config();
 
@@ -41,6 +42,8 @@ bot.hears(/^go$/i, async (ctx: Context) => {
 
   await ctx.reply(`Processing ${queue.file_ids.length} file(s)...`);
 
+  const htmlContents: string[] = [];
+
   for (let i = 0; i < queue.file_ids.length; i++) {
     const file_id = queue.file_ids[i];
     const file_name = queue.file_names[i];
@@ -59,6 +62,7 @@ bot.hears(/^go$/i, async (ctx: Context) => {
           res.on('error', reject);
         }).on('error', reject);
       });
+      htmlContents.push(data);
       const lines = data.split(/\r?\n/);
       const totalLines = lines.length;
       await ctx.reply(`File: ${file_name}\nTotal lines: ${totalLines}`);
@@ -66,6 +70,10 @@ bot.hears(/^go$/i, async (ctx: Context) => {
       await ctx.reply(`❌ Error processing file: ${file_name}`);
     }
   }
+
+  // Call the film processing service with all HTML contents
+  processFilms(htmlContents);
+
   // Clear the queue after processing
   userFileQueue[userId] = { file_ids: [], file_names: [] };
 });
