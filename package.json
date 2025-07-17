@@ -2,5 +2,15 @@
   "dependencies": {
     "dotenv": "^17.2.0",
     "telegraf": "^4.16.3"
-  }
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.14",
+    "typescript": "^5.8.3"
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "start": "node dist/KinoUltraBoxd/bot.js"
+  },
+  "main": "dist/KinoUltraBoxd/bot.js"
 }
