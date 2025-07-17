@@ -3,7 +3,8 @@
     "@types/cheerio": "^0.22.35",
     "cheerio": "^1.1.0",
     "dotenv": "^17.2.0",
-    "telegraf": "^4.16.3"
+    "telegraf": "^4.16.3",
+    "better-sqlite3": "^9.2.3"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",
@@ -18,7 +19,8 @@
     "typecheck": "tsc --noEmit",
     "prestart": "npm run build",
     "start": "node dist/KinoUltraBoxd/bot.js",
-    "dev": "ts-node KinoUltraBoxd/bot.ts"
+    "dev": "ts-node KinoUltraBoxd/bot.ts",
+    "test": "jest"
   },
   "main": "dist/KinoUltraBoxd/bot.js"
 }

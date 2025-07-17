@@ -1,5 +1,6 @@
 import { parseKinopoiskIdsFromHtmlFiles } from './htmlParsingService';
 import { FilmData } from './models/FilmData';
+import { attachImdbIds } from './localImdbService';
 
 /**
  * Stub function to process a list of HTML file contents into film data models.
@@ -10,6 +11,6 @@ export function process(htmlFiles: string[]): FilmData[] {
   console.log('process');
   const parsedFilms = parseKinopoiskIdsFromHtmlFiles(htmlFiles);
   console.log('Extracted entries:', parsedFilms);
-  // TODO: Implement actual processing logic
-  return [];
+  const filmsWithImdb = attachImdbIds(parsedFilms);
+  return filmsWithImdb;
 } 
