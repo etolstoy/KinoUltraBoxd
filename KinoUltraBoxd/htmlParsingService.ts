@@ -22,8 +22,26 @@ export function parseKinopoiskIdsFromHtmlFiles(htmlFiles: string[]): number[] {
       return;
     }
 
+    // Extract Kinopoisk ID using a few fallbacks because the exact markup may differ
     items.each((_: number, el: cheerio.Element) => {
-      const idStr = $(el).attr('data-id');
+      let idStr: string | undefined = undefined;
+
+      // 1) Newer markup may keep id right on the .item element
+      idStr = $(el).attr('data-id');
+
+      // 2) Mobile / alternative markup keeps it on a nested selector with attribute "mid"
+      if (!idStr) {
+        const midAttr = $(el).find('[mid]').attr('mid');
+        if (midAttr) idStr = midAttr;
+      }
+
+      // 3) Fallback: parse the numeric part of the first film/series url inside the item
+      if (!idStr) {
+        const href = $(el).find('a[href*="/film/"], a[href*="/series/"]').first().attr('href');
+        const match = href?.match(/\/(?:film|series)\/(\d+)/);
+        if (match) idStr = match[1];
+      }
+
       if (idStr && /^\d+$/.test(idStr)) {
         allIds.push(Number(idStr));
       }

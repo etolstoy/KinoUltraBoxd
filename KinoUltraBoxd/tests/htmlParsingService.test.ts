@@ -9,7 +9,7 @@ describe('htmlParsingService', () => {
     const html = fs.readFileSync(htmlPath, 'utf8');
     const ids = parseKinopoiskIdsFromHtmlFiles([html]);
     expect(Array.isArray(ids)).toBe(true);
-    // Optionally: expect(ids.length).toBeGreaterThan(0);
+    expect(ids.length).toBe(9);
     console.log('Extracted kinopoiskIds:', ids);
   });
 }); 
