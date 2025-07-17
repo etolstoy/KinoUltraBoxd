@@ -39,39 +39,61 @@ const https = __importStar(require("https"));
 dotenv.config();
 const bot = new telegraf_1.Telegraf(process.env.BOT_TOKEN);
 bot.start((ctx) => ctx.reply('Hello'));
+// In-memory storage for user file queues
+const userFileQueue = {};
 bot.on('document', async (ctx) => {
     const doc = ctx.message.document;
+    const userId = ctx.from?.id;
+    if (!userId)
+        return;
     // Show temporary status message
     const statusMsg = await ctx.reply('📥 Downloading and reading your file...');
-    try {
-        // Get file link from Telegram
-        const fileLink = await ctx.telegram.getFileLink(doc.file_id);
-        // Download the file into memory
-        let data = '';
-        https.get(fileLink.href, (res) => {
-            res.setEncoding('utf8');
-            res.on('data', (chunk) => {
-                data += chunk;
-            });
-            res.on('end', async () => {
-                const lines = data.split(/\r?\n/);
-                const totalLines = lines.length;
-                await ctx.reply(`Total lines: ${totalLines}`);
-                await ctx.deleteMessage(statusMsg.message_id);
-            });
-            res.on('error', async () => {
-                await ctx.reply('❌ Error reading the file.');
-                await ctx.deleteMessage(statusMsg.message_id);
-            });
-        }).on('error', async () => {
-            await ctx.reply('❌ Error downloading the file.');
-            await ctx.deleteMessage(statusMsg.message_id);
-        });
+    // Queue the file for this user
+    if (!userFileQueue[userId]) {
+        userFileQueue[userId] = { file_ids: [], file_names: [] };
     }
-    catch (err) {
-        await ctx.reply('❌ Failed to process the file.');
-        await ctx.deleteMessage(statusMsg.message_id);
+    userFileQueue[userId].file_ids.push(doc.file_id);
+    userFileQueue[userId].file_names.push(doc.file_name || 'unnamed.html');
+    await ctx.reply(`Queued file: ${doc.file_name || 'unnamed.html'}\nSend 'go' when ready to process all queued files.`);
+});
+bot.hears(/^go$/i, async (ctx) => {
+    const userId = ctx.from?.id;
+    if (!userId)
+        return;
+    const queue = userFileQueue[userId];
+    if (!queue || queue.file_ids.length === 0) {
+        await ctx.reply('No files queued. Please send HTML files first.');
+        return;
     }
+    await ctx.reply(`Processing ${queue.file_ids.length} file(s)...`);
+    for (let i = 0; i < queue.file_ids.length; i++) {
+        const file_id = queue.file_ids[i];
+        const file_name = queue.file_names[i];
+        try {
+            const fileLink = await ctx.telegram.getFileLink(file_id);
+            let data = '';
+            await new Promise((resolve, reject) => {
+                https.get(fileLink.href, (res) => {
+                    res.setEncoding('utf8');
+                    res.on('data', (chunk) => {
+                        data += chunk;
+                    });
+                    res.on('end', () => {
+                        resolve();
+                    });
+                    res.on('error', reject);
+                }).on('error', reject);
+            });
+            const lines = data.split(/\r?\n/);
+            const totalLines = lines.length;
+            await ctx.reply(`File: ${file_name}\nTotal lines: ${totalLines}`);
+        }
+        catch (err) {
+            await ctx.reply(`❌ Error processing file: ${file_name}`);
+        }
+    }
+    // Clear the queue after processing
+    userFileQueue[userId] = { file_ids: [], file_names: [] };
 });
 bot.launch();
 // Enable graceful stop
