@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { FilmData } from './models/FilmData';
+import { FilmData, PotentialMatch } from './models/FilmData';
 
 /**
  * Very small wrapper around TMDB "search/movie" API – it searches a movie by
@@ -23,6 +23,7 @@ interface TmdbMovie {
   title: string;
   popularity: number;
   release_date?: string;
+  overview?: string;
 }
 
 interface SearchResponse {
@@ -58,7 +59,7 @@ async function searchOnce(title: string, year: number | null): Promise<TmdbMovie
 /**
  * Returns a TMDB identifier for the supplied title/year pair, or null.
  */
-async function lookupTmdbId(title: string, year: number | null): Promise<number | null> {
+async function collectPotentialMatches(title: string, year: number | null): Promise<PotentialMatch[]> {
   // Build list of years to try: target, +1, -1.
   const yearsToTry: (number | null)[] = [];
   if (year != null) {
@@ -74,14 +75,21 @@ async function lookupTmdbId(title: string, year: number | null): Promise<number 
     results.push(...batch);
   }
 
-  if (results.length === 0) return null;
+  if (results.length === 0) return [];
 
-  // Remove duplicates by id keeping the first (highest popularity will be first later).
+  // Remove duplicates by id.
   const unique = new Map<number, TmdbMovie>();
   for (const movie of results) unique.set(movie.id, movie);
 
-  const sorted = [...unique.values()].sort((a, b) => b.popularity - a.popularity);
-  return sorted[0]?.id ?? null;
+  const sorted = [...unique.values()].sort((a, b) => b.popularity - a.popularity).slice(0, 9);
+
+  return sorted.map((m): PotentialMatch => ({
+    title: m.title,
+    year: m.release_date ? Number(m.release_date.substring(0, 4)) : null,
+    tmdbId: m.id,
+    popularity: m.popularity ?? null,
+    description: m.overview ?? null,
+  }));
 }
 
 /**
@@ -99,13 +107,8 @@ export async function attachTmdbIdsViaSearch(films: FilmData[]): Promise<FilmDat
   }
 
   const enrichedPromises = films.map(async (film) => {
-    if (film.tmdbId != null) return { ...film }; // nothing to do
-
-    const tmdbId = await lookupTmdbId(film.title, film.year);
-    if (tmdbId != null) {
-      return { ...film, tmdbId };
-    }
-    return { ...film };
+    const matches = await collectPotentialMatches(film.title, film.year);
+    return { ...film, potentialMatches: matches };
   });
 
   return Promise.all(enrichedPromises);
