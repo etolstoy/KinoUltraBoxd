@@ -14,7 +14,7 @@ dotenv.config();
 
 const bot = new Telegraf(process.env.BOT_TOKEN as string);
 
-bot.start((ctx: Context) => ctx.reply('Hello'));
+bot.start((ctx: Context) => ctx.reply('🎬 Привет! Я помогу тебе импортировать фильмы с Кинопоиска на Letterboxd. Для начала отправь мне HTML-файлы с твоими оценками. Чтобы узнать, как это сделать, напиши /help!\n\nКогда загрузишь файлы и будешь готов начать, нажми на кнопку "✅ Начать экспорт". А если вдруг что-то пойдет не так, напиши @etolstoy!'));
 
 // ---------------- Session & persistence layer ----------------
 const loadState = (userId: number) => sessionManager.get(userId);
@@ -45,22 +45,20 @@ bot.on('document', async (ctx: Context) => {
   if (!userId) return;
 
   // Show temporary status message
-  const statusMsg = await ctx.reply('📥 Downloading and reading your file...');
+  const statusMsg = await ctx.reply('📥 Скачиваю и проверяю файл...');
 
   // Queue the file for this user (persisted)
   const session = await loadState(userId);
   session.fileQueue.file_ids.push(doc.file_id);
   session.fileQueue.file_names.push(doc.file_name || 'unnamed.html');
   await saveState(userId, session);
-
-  await ctx.reply(`Queued file: ${doc.file_name || 'unnamed.html'}\nSend 'go' when ready to process all queued files.`);
 });
 
 // Helper processing function reused in multiple places
 async function processQueuedFiles(ctx: Context, session: BotSessionState): Promise<void> {
   const queue = session.fileQueue;
   if (!queue || queue.file_ids.length === 0) {
-    await ctx.reply('No files queued. Please send HTML files first.');
+    await ctx.reply('❌ Кажется, ты еще не отправил файлы. Пожалуйста, попробуй их прислать еще раз.');
     return;
   }
 
@@ -93,12 +91,12 @@ async function processQueuedFiles(ctx: Context, session: BotSessionState): Promi
       const processedCount = films.filter((f) => f.tmdbId != null || f.imdbId != null).length;
       const manualCount = films.filter((f) => f.type === 'film' && f.tmdbId == null && f.imdbId == null).length;
       const keyboard = Markup.inlineKeyboard([
-        [Markup.button.callback('🙋‍♂️Выбрать вручную', 'manual_start')],
-        [Markup.button.callback('🛑Пропустить все', 'skip_all')],
+        [Markup.button.callback('🙋‍♂️ Выбрать вручную', 'manual_start')],
+        [Markup.button.callback('🛑 Пропустить все', 'skip_all')],
       ]);
 
       await ctx.reply(
-        `👍Хорошие новости – я автоматически обработал ${processedCount} фильмов, и они уже готовы к импорту на Letterboxd! Но есть вопросики к ${manualCount} фильмов, нужна твоя помощь. Что будем делать?`,
+        `👍 Хорошие новости – я автоматически обработал ${processedCount} фильмов, и они уже готовы к импорту на Letterboxd!\n\nНо есть вопросики к ${manualCount} фильмов, нужна твоя помощь. Что будем делать?`,
         keyboard,
       );
 
@@ -116,14 +114,14 @@ async function processQueuedFiles(ctx: Context, session: BotSessionState): Promi
   } catch (err: any) {
     if (err instanceof Error && err.message === 'KIN_TOKEN_MISSING') {
       // Ask user for token and keep queue intact
-      await ctx.reply('Please provide token for Kinopoisk API. You can get it for free from @kinopoiskdev_bot, it takes less than a minute');
+      await ctx.reply('🙋🏻 Часть фильмов уже обработана, но найти пока получилось не все. Нам придется использовать неофициальный API Кинопоиска, для работы с которым тебе надо получить личный токен. Это бесплатно и очень просто – напиши @kinopoiskdev_bot, и меньше чем за минуту токен будет у тебя. Пришли его в ответ на это сообщение, и я продолжу!');
       session.awaitingKinopoiskToken = true;
       await saveState(ctx.from!.id, session);
       return;
     }
 
     console.error('[bot] film processing failed', err);
-    await ctx.reply('❌ Failed to process films. Please try again later.');
+    await ctx.reply('❌ Какие-то проблемы с обработкой файлов. Попробуй еще раз или напиши @etolstoy!');
   }
 }
 
@@ -149,7 +147,7 @@ bot.on('text', async (ctx: Context) => {
   session.awaitingKinopoiskToken = false;
   await saveState(userId, session);
 
-  await ctx.reply('🔐 Token saved! Re-processing your files...');
+  await ctx.reply('🔐 Отлично, спасибо за токен! Продолжаю обработку файлов...');
 
   // Retry processing queue automatically
   await processQueuedFiles(ctx, session);
