@@ -209,6 +209,14 @@ bot.on('text', async (ctx: Context) => {
   const token = (ctx.message as any).text?.trim();
   if (!token) return;
 
+  // Remove the user's message containing the sensitive token to keep the chat history clean
+  try {
+    // deleteMessage without params deletes the message that triggered the current ctx
+    await ctx.deleteMessage();
+  } catch (_) {
+    // Ignore deletion errors (e.g., insufficient rights or message too old)
+  }
+
   session.kinopoiskToken = token;
   session.awaitingKinopoiskToken = false;
   await saveState(userId, session);
