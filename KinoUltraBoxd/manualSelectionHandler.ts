@@ -24,7 +24,7 @@ async function promptSingleMatch(
   const matchYearPart = match.year ? `(${match.year})` : '';
   const descrPart = match.description ? `\n${match.description}` : '';
 
-  const header = `👀 Я нашел только одно подходящее совпадение для *[${film.title} ${filmYearPart}](${film.kinopoiskUrl})*`;
+  const header = `👀 Я нашел только одно подходящее совпадение для фильма [${film.title} ${filmYearPart}](${film.kinopoiskUrl})`;
   const candidateLine = `[${match.title} ${matchYearPart}](${match.tmdbUrl})\n${descrPart}`;
 
   const keyboardButtons: any[] = [
@@ -41,7 +41,8 @@ async function promptSingleMatch(
 
   const keyboard = Markup.inlineKeyboard(keyboardButtons);
 
-  await ctx.reply(`${header}\n\n${candidateLine}`, keyboard);
+  // Use Markdown parse mode to ensure formatting (bold, links) renders correctly
+  await ctx.replyWithMarkdown(`${header}\n\n${candidateLine}`, keyboard);
 }
 
 async function promptMultiMatch(
@@ -53,7 +54,7 @@ async function promptMultiMatch(
 ): Promise<void> {
   const filmYearPart = film.year ? `(${film.year})` : '';
   const lines: string[] = [
-    `👀 Я нашел несколько подходящих совпадений для *[${film.title} ${filmYearPart}](${film.kinopoiskUrl})*`,
+    `👀 Я нашел несколько подходящих совпадений для фильма [${film.title} ${filmYearPart}](${film.kinopoiskUrl})`,
   ];
   matches.forEach((m, idx) => {
     const yearPart = m.year ? `(${m.year})` : '';
@@ -82,7 +83,9 @@ async function promptMultiMatch(
 
   const keyboard = Markup.inlineKeyboard(keyboardRows);
 
-  await ctx.reply(lines.join('\n'), keyboard);
+  // Use Markdown parse mode for proper rich formatting of the list
+  // Separate each candidate line with an extra newline for readability
+  await ctx.replyWithMarkdown(lines.join('\n\n'), keyboard);
 }
 
 /**
