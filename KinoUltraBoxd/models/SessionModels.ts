@@ -59,4 +59,6 @@ export interface BotSessionState {
   kinopoiskToken?: string;
   /** Indicates that the bot is waiting for the user to send their Kinopoisk token */
   awaitingKinopoiskToken?: boolean;
+  /** Telegram message id of the temporary status message shown during processing */
+  tempStatusMessageId?: number;
 } 

@@ -14,14 +14,47 @@ dotenv.config();
 
 const bot = new Telegraf(process.env.BOT_TOKEN as string);
 
-bot.start((ctx: Context) => ctx.reply('🎬 Привет! Я помогу тебе импортировать фильмы с Кинопоиска на Letterboxd. Для начала отправь мне HTML-файлы с твоими оценками. Чтобы узнать, откуда их взять, вызови команду /help\n\nКогда ты загрузишь файлы, появится кнопка "✅ Начать экспорт". А если вдруг что-то пойдет не так, напиши @etolstoy!'));
+// Start command with inline "Start export" button
+bot.start(async (ctx: Context) => {
+  // Reset any previously uploaded files when /start is invoked
+  const userId = ctx.from?.id;
+  if (userId) {
+    const session = await loadState(userId);
+    session.fileQueue = { file_ids: [], file_names: [] };
+    await saveState(userId, session);
+  }
+  const keyboard = Markup.inlineKeyboard([
+    [Markup.button.callback('✅ Начать экспорт', 'export_start')],
+  ]);
+
+  await ctx.reply(
+    '🎬 Привет! Я помогу тебе импортировать фильмы с Кинопоиска на Letterboxd. Для начала отправь мне HTML-файлы с твоими оценками. Чтобы узнать, откуда их взять, вызови команду /help\n\nКогда ты загрузишь файлы, нажми ✅ кнопку под этим сообщением. А если вдруг что-то пойдет не так, напиши @etolstoy!',
+    keyboard,
+  );
+});
 
 // ---------------- Session & persistence layer ----------------
 const loadState = (userId: number) => sessionManager.get(userId);
 const saveState = (userId: number, state: BotSessionState) => sessionManager.set(userId, state);
 
 // ---------------- Helper ----------------
+// Remove previously saved temporary status message (if any)
+async function clearTempStatus(ctx: Context, session: BotSessionState): Promise<void> {
+  if (session.tempStatusMessageId) {
+    try {
+      await ctx.telegram.deleteMessage(ctx.chat!.id, session.tempStatusMessageId);
+    } catch (_) {
+      // Ignore deletion errors (message might be too old or already deleted)
+    }
+    delete (session as any).tempStatusMessageId;
+    await saveState(ctx.from!.id, session);
+  }
+}
+
 async function sendStatsReport(ctx: Context, films: FilmData[]): Promise<void> {
+  const session = await loadState(ctx.from!.id);
+  await clearTempStatus(ctx, session);
+
   const report = buildStatsReport(films);
   await ctx.reply(report.message);
   if (report.notFoundFilms && report.notFoundFilms.length > 0) {
@@ -44,9 +77,6 @@ bot.on('document', async (ctx: Context) => {
   const userId = ctx.from?.id;
   if (!userId) return;
 
-  // Show temporary status message
-  const statusMsg = await ctx.reply('📥 Скачиваю и проверяю файл...');
-
   // Queue the file for this user (persisted)
   const session = await loadState(userId);
   session.fileQueue.file_ids.push(doc.file_id);
@@ -58,6 +88,7 @@ bot.on('document', async (ctx: Context) => {
 async function processQueuedFiles(ctx: Context, session: BotSessionState): Promise<void> {
   const queue = session.fileQueue;
   if (!queue || queue.file_ids.length === 0) {
+    await clearTempStatus(ctx, session);
     await ctx.reply('❌ Кажется, ты еще не отправил файлы. Пожалуйста, попробуй их прислать еще раз.');
     return;
   }
@@ -69,6 +100,7 @@ async function processQueuedFiles(ctx: Context, session: BotSessionState): Promi
     htmlContents = await downloadHtmlFiles(ctx.telegram, queue.file_ids);
   } catch (err) {
     console.error('[bot] file download failed', err);
+    await clearTempStatus(ctx, session);
     await ctx.reply('❌ Не получилось скачать файлы. Попробуйте еще раз.');
     return;
   }
@@ -83,6 +115,7 @@ async function processQueuedFiles(ctx: Context, session: BotSessionState): Promi
       .filter(({ film }) => film.potentialMatches && film.potentialMatches.length > 0);
 
     if (needManual.length === 0) {
+      await clearTempStatus(ctx, session);
       await sendStatsReport(ctx, films);
       await sessionManager.clearSelection(ctx.from!.id);
     } else {
@@ -95,6 +128,7 @@ async function processQueuedFiles(ctx: Context, session: BotSessionState): Promi
         [Markup.button.callback('🛑 Пропустить все', 'skip_all')],
       ]);
 
+      await clearTempStatus(ctx, session);
       await ctx.reply(
         `👍 Хорошие новости – я автоматически обработал ${processedCount} фильмов, и они уже готовы к импорту на Letterboxd!\n\nНо есть вопросики к ${manualCount} фильмов, нужна твоя помощь. Что будем делать?`,
         keyboard,
@@ -114,6 +148,7 @@ async function processQueuedFiles(ctx: Context, session: BotSessionState): Promi
   } catch (err: any) {
     if (err instanceof Error && err.message === 'KIN_TOKEN_MISSING') {
       // Ask user for token and keep queue intact
+      await clearTempStatus(ctx, session);
       await ctx.reply('🙋🏻 Часть фильмов уже обработана, но найти пока получилось не все. Нам придется использовать неофициальный API Кинопоиска, для работы с которым тебе надо получить личный токен. Это бесплатно и очень просто – напиши @kinopoiskdev_bot, и меньше чем за минуту токен будет у тебя. Пришли его в ответ на это сообщение, и я продолжу!');
       session.awaitingKinopoiskToken = true;
       await saveState(ctx.from!.id, session);
@@ -121,6 +156,7 @@ async function processQueuedFiles(ctx: Context, session: BotSessionState): Promi
     }
 
     console.error('[bot] film processing failed', err);
+    await clearTempStatus(ctx, session);
     await ctx.reply('❌ Какие-то проблемы с обработкой файлов. Попробуй еще раз или напиши @etolstoy!');
   }
 }
@@ -129,6 +165,36 @@ bot.hears(/^go$/i, async (ctx: Context) => {
   const userId = ctx.from?.id;
   if (!userId) return;
   const session = await loadState(userId);
+  await processQueuedFiles(ctx, session);
+});
+
+// Handle "Start export" button press
+bot.action('export_start', async (ctx) => {
+  const userId = ctx.from?.id;
+  if (!userId) return;
+
+  const session = await loadState(userId);
+
+  // If there are no queued files, keep the button and inform the user
+  if (!session.fileQueue || session.fileQueue.file_ids.length === 0) {
+    await ctx.answerCbQuery('❌ Сначала отправь HTML-файлы для обработки', { show_alert: true });
+    return; // do NOT remove the button
+  }
+
+  await ctx.answerCbQuery(); // acknowledge button press
+
+  // Remove the button but keep the original message
+  try {
+    await ctx.editMessageReplyMarkup(undefined);
+  } catch (_) {
+    // Ignore errors (e.g., if message too old to edit)
+  }
+
+  // Show temporary processing status
+  const statusMsg = await ctx.reply('⏰ Начал обработку твоих фильмов. Скоро все будет!');
+  session.tempStatusMessageId = (statusMsg as any).message_id;
+  await saveState(userId, session);
+
   await processQueuedFiles(ctx, session);
 });
 
@@ -147,6 +213,7 @@ bot.on('text', async (ctx: Context) => {
   session.awaitingKinopoiskToken = false;
   await saveState(userId, session);
 
+  await clearTempStatus(ctx, session);
   await ctx.reply('🔐 Отлично, спасибо за токен! Продолжаю обработку файлов...');
 
   // Retry processing queue automatically
