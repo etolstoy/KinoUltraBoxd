@@ -7,6 +7,7 @@ import { promptNextFilm, registerSelectionHandler } from './manualSelectionHandl
 import { BotSessionState } from './models/SessionModels';
 import { sessionManager } from './services/sessionManager';
 import { buildStatsReport } from './services/statsReportService';
+import { generateLetterboxdCsv } from './services/letterboxdExportService';
 import { FilmData } from './models/FilmData';
 
 dotenv.config();
@@ -26,6 +27,12 @@ async function sendStatsReport(ctx: Context, films: FilmData[]): Promise<void> {
   if (report.notFoundFilms && report.notFoundFilms.length > 0) {
     const buffer = Buffer.from(report.notFoundFilms.join('\n'), 'utf-8');
     await ctx.replyWithDocument({ source: buffer, filename: 'not_found_films.txt' });
+  }
+
+  // Export CSV for Letterboxd
+  if (report.stats.exportableCount > 0) {
+    const csvBuffer = generateLetterboxdCsv(films);
+    await ctx.replyWithDocument({ source: csvBuffer, filename: 'letterboxd.csv' });
   }
 }
 
