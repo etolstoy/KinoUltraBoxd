@@ -18,6 +18,7 @@ async function promptSingleMatch(
   filmIdx: number,
   film: FilmData,
   match: PotentialMatch,
+  allowSkipAll: boolean, // NEW PARAM
 ): Promise<void> {
   const filmYearPart = film.year ? `(${film.year})` : '';
   const matchYearPart = match.year ? `(${match.year})` : '';
@@ -26,10 +27,19 @@ async function promptSingleMatch(
   const header = `Я нашел только одно подходящее совпадение с ${film.title} ${filmYearPart}:`;
   const candidateLine = `${match.title} ${matchYearPart}${descrPart}`;
 
-  const keyboard = Markup.inlineKeyboard([
+  const keyboardButtons: any[] = [
     [Markup.button.callback('✅Да, это он', `single_yes_${filmIdx}`)],
     [Markup.button.callback('❌Нет, это не он', `single_no_${filmIdx}`)],
-  ]);
+  ];
+
+  if (allowSkipAll) {
+    // Add a dedicated row for skipping the rest of the queue
+    keyboardButtons.push([
+      Markup.button.callback('🛑Пропустить все', 'skip_all'),
+    ]);
+  }
+
+  const keyboard = Markup.inlineKeyboard(keyboardButtons);
 
   await ctx.reply(`${header}\n\n${candidateLine}`, keyboard);
 }
@@ -39,6 +49,7 @@ async function promptMultiMatch(
   filmIdx: number,
   film: FilmData,
   matches: PotentialMatch[],
+  allowSkipAll: boolean, // NEW PARAM
 ): Promise<void> {
   const lines: string[] = [
     `Пожалуйста, выберите правильный вариант для записи с кинопоиска для фильма "${film.title}"`,
@@ -49,17 +60,26 @@ async function promptMultiMatch(
     lines.push(`${idx + 1}. ${m.title} ${yearPart}${descrPart}`);
   });
 
-  const keyboard = Markup.inlineKeyboard(
-    [
-      // Numerical choice buttons
-      ...matches.map((_, idx) =>
-        Markup.button.callback(String(idx + 1), `choose_${filmIdx}_${idx}`),
-      ),
-      // Extra row with a "skip" button so user can ignore this film
-      Markup.button.callback('❌Пропустить', `multi_skip_${filmIdx}`),
-    ],
-    { columns: 3 },
+  const numberButtons = matches.map((_, idx) =>
+    Markup.button.callback(String(idx + 1), `choose_${filmIdx}_${idx}`),
   );
+
+  const keyboardRows: any[][] = [];
+
+  // Rows for number buttons – 3 per row for better UX
+  for (let i = 0; i < numberButtons.length; i += 3) {
+    keyboardRows.push(numberButtons.slice(i, i + 3));
+  }
+
+  // Row with single-film skip
+  keyboardRows.push([Markup.button.callback('❌Пропустить', `multi_skip_${filmIdx}`)]);
+
+  // Row with skip-all when allowed
+  if (allowSkipAll) {
+    keyboardRows.push([Markup.button.callback('🛑Пропустить все', 'skip_all')]);
+  }
+
+  const keyboard = Markup.inlineKeyboard(keyboardRows);
 
   await ctx.reply(lines.join('\n'), keyboard);
 }
@@ -94,12 +114,15 @@ export async function promptNextFilm(ctx: Context): Promise<void> {
   const film = state.films[filmIdx];
   const matches = film.potentialMatches ?? [];
 
+  const remaining = state.selectionQueue.length - state.currentIdx;
+  const allowSkipAll = remaining > 3; // Show global skip when >3 films remain
+
   if (matches.length === 1) {
-    await promptSingleMatch(ctx, filmIdx, film, matches[0]);
+    await promptSingleMatch(ctx, filmIdx, film, matches[0], allowSkipAll);
     return;
   }
 
-  await promptMultiMatch(ctx, filmIdx, film, matches);
+  await promptMultiMatch(ctx, filmIdx, film, matches, allowSkipAll);
 }
 
 /**
@@ -241,6 +264,54 @@ export function registerSelectionHandler(
     } catch {
       /* ignore if deletion fails */
     }
+
+    await promptNextFilm(ctx);
+  });
+
+  // ------- Skip ALL remaining films (initial prompt) ---------------------
+  bot.action('skip_all', async (ctx) => {
+    await ctx.answerCbQuery();
+
+    const confirmKeyboard = Markup.inlineKeyboard([
+      [Markup.button.callback('🤔Нет, давай разберусь сейчас', 'skip_all_cancel')],
+      [Markup.button.callback('🛑Точно пропускаем', 'skip_all_confirm')],
+    ]);
+
+    await ctx.reply(
+      'Если не хочешь разбираться с совпадениями сейчас, можешь пропустить все фильмы. Не переживай – я пришлю их список отдельным файлом, и ты сможешь потом добавить их вручную на Letterboxd',
+      confirmKeyboard,
+    );
+  });
+
+  // ------- Cancel skipping all ------------------------------------------
+  bot.action('skip_all_cancel', async (ctx) => {
+    await ctx.answerCbQuery('Продолжаем выбор фильмов');
+    try {
+      await ctx.deleteMessage(); // Remove the confirmation message
+    } catch {/* ignore */}
+    await promptNextFilm(ctx);
+  });
+
+  // ------- Confirm skipping all -----------------------------------------
+  bot.action('skip_all_confirm', async (ctx) => {
+    const userId = ctx.from?.id;
+    if (!userId) return;
+    const session = await loadState(userId);
+    const state = session.selection;
+    if (!state) {
+      await ctx.answerCbQuery('Нет активного выбора.');
+      return;
+    }
+
+    // Mark all remaining selections as processed by moving cursor to the end
+    state.currentIdx = state.selectionQueue.length;
+    session.selection = state;
+    await saveState(userId, session);
+
+    await ctx.answerCbQuery('⏭️ Все оставшиеся фильмы пропущены');
+    try {
+      await ctx.deleteMessage(); // Remove confirmation prompt
+    } catch {/* ignore */}
 
     await promptNextFilm(ctx);
   });
