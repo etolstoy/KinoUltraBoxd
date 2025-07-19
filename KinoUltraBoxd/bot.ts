@@ -56,7 +56,7 @@ async function sendStatsReport(ctx: Context, films: FilmData[]): Promise<void> {
   await clearTempStatus(ctx, session);
 
   const report = buildStatsReport(films);
-  await ctx.reply(report.message);
+  await ctx.reply(report.message, { parse_mode: 'Markdown' });
   if (report.notFoundFilms && report.notFoundFilms.length > 0) {
     const buffer = Buffer.from(report.notFoundFilms.join('\n'), 'utf-8');
     await ctx.replyWithDocument({ source: buffer, filename: 'not_found_films.txt' });

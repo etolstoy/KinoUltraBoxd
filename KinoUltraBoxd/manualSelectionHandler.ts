@@ -13,6 +13,33 @@ const saveState = (userId: number, state: BotSessionState) => sessionManager.set
 
 // --- Lower-level helpers ---------------------------------------------------
 
+/**
+ * Deletes previously sent poster messages (if any) and clears the ids from session.
+ */
+async function removePosterMessages(ctx: Context, session: BotSessionState): Promise<void> {
+  const chatId = ctx.chat?.id;
+  if (!chatId) return;
+  const ids = session.selection?.posterMessageIds;
+  if (!ids || ids.length === 0) return;
+
+  for (const id of ids) {
+    try {
+      await ctx.telegram.deleteMessage(chatId, id);
+    } catch {
+      /* ignore – message may already be gone */
+    }
+  }
+
+  if (session.selection) {
+    session.selection.posterMessageIds = undefined;
+    // Persist the cleared state
+    const userId = ctx.from?.id;
+    if (userId) {
+      await saveState(userId, session);
+    }
+  }
+}
+
 async function promptSingleMatch(
   ctx: Context,
   filmIdx: number,
@@ -41,8 +68,23 @@ async function promptSingleMatch(
 
   const keyboard = Markup.inlineKeyboard(keyboardButtons);
 
-  // Use Markdown parse mode to ensure formatting (bold, links) renders correctly
+  // 1) Send list message WITH buttons (Markdown formatting)
   await ctx.replyWithMarkdown(`${header}\n\n${candidateLine}`, keyboard);
+
+  // 2) Send poster image (without any caption / buttons) and remember its message id
+  if (match.posterUrl) {
+    const posterMessage = await ctx.replyWithPhoto(match.posterUrl);
+
+    // Persist poster message id for later cleanup
+    const userId = ctx.from?.id;
+    if (userId) {
+      const session = await loadState(userId);
+      if (session.selection) {
+        session.selection.posterMessageIds = [posterMessage.message_id];
+        await saveState(userId, session);
+      }
+    }
+  }
 }
 
 async function promptMultiMatch(
@@ -53,13 +95,14 @@ async function promptMultiMatch(
   allowSkipAll: boolean, // NEW PARAM
 ): Promise<void> {
   const filmYearPart = film.year ? `(${film.year})` : '';
-  const lines: string[] = [
-    `👀 Я нашел несколько подходящих совпадений для фильма [${film.title} ${filmYearPart}](${film.kinopoiskUrl})`,
-  ];
+  const headerLine = `👀 Я нашел несколько подходящих совпадений для фильма [${film.title} ${filmYearPart}](${film.kinopoiskUrl})`;
+
+  // ------------- Prepare textual list (first message) -------------
+  const listLines: string[] = [headerLine];
   matches.forEach((m, idx) => {
     const yearPart = m.year ? `(${m.year})` : '';
     const descrPart = m.description ? `\n${m.description}` : '';
-    lines.push(`${idx + 1}. [${m.title} ${yearPart}](${m.tmdbUrl})${descrPart}`);
+    listLines.push(`${idx + 1}. [${m.title} ${yearPart}](${m.tmdbUrl})${descrPart}`);
   });
 
   const numberButtons = matches.map((_, idx) =>
@@ -83,9 +126,38 @@ async function promptMultiMatch(
 
   const keyboard = Markup.inlineKeyboard(keyboardRows);
 
-  // Use Markdown parse mode for proper rich formatting of the list
-  // Separate each candidate line with an extra newline for readability
-  await ctx.replyWithMarkdown(lines.join('\n\n'), keyboard);
+  // Send list message WITH buttons first
+  await ctx.replyWithMarkdown(listLines.join('\n\n'), keyboard);
+
+  // ------------- Send posters (second message, no captions) --------
+  const mediaGroup = matches.reduce<any[]>((acc, m) => {
+    if (!m.posterUrl) return acc;
+    acc.push({ type: 'photo', media: m.posterUrl } as any);
+    return acc;
+  }, []);
+
+  let posterIds: number[] = [];
+  if (mediaGroup.length > 0) {
+    try {
+      const responses = await ctx.replyWithMediaGroup(mediaGroup);
+      // `responses` is an array of messages
+      posterIds = responses.map((msg: any) => msg.message_id);
+    } catch (err) {
+      console.error('[manualSelectionHandler] Failed to send media group', err);
+    }
+  }
+
+  // Persist poster message ids for cleanup
+  if (posterIds.length > 0) {
+    const userId = ctx.from?.id;
+    if (userId) {
+      const session = await loadState(userId);
+      if (session.selection) {
+        session.selection.posterMessageIds = posterIds;
+        await saveState(userId, session);
+      }
+    }
+  }
 }
 
 /**
@@ -181,6 +253,7 @@ export function registerSelectionHandler(
       /* Message might have been deleted already or deletion not permitted */
     }
 
+    await removePosterMessages(ctx, session);
     await promptNextFilm(ctx);
   });
 
@@ -222,6 +295,7 @@ export function registerSelectionHandler(
       await ctx.deleteMessage();
     } catch {/* ignore */}
 
+    await removePosterMessages(ctx, session);
     await promptNextFilm(ctx);
   });
 
@@ -246,6 +320,7 @@ export function registerSelectionHandler(
       await ctx.deleteMessage();
     } catch {/* ignore */}
 
+    await removePosterMessages(ctx, session);
     await promptNextFilm(ctx);
   });
 
@@ -273,6 +348,7 @@ export function registerSelectionHandler(
       /* ignore if deletion fails */
     }
 
+    await removePosterMessages(ctx, session);
     await promptNextFilm(ctx);
   });
 
@@ -295,6 +371,8 @@ export function registerSelectionHandler(
     try {
       await ctx.deleteMessage();
     } catch { /* ignore if already removed */ }
+
+    await removePosterMessages(ctx, session);
 
     // Mark all remaining selections as processed by moving cursor to the end
     state.currentIdx = state.selectionQueue.length;
@@ -347,6 +425,7 @@ export function registerSelectionHandler(
       await ctx.deleteMessage(); // Remove confirmation prompt
     } catch {/* ignore */}
 
+    await removePosterMessages(ctx, session);
     await promptNextFilm(ctx);
   });
 } 

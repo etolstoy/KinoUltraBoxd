@@ -49,7 +49,7 @@ function computeStats(films: FilmData[]): ExportStats {
 function buildStatsMessage(stats: ExportStats): string {
   const lines: string[] = [];
 
-  lines.push('✅ Побег из Кинопоиска завершился успешно!');
+  lines.push('✅ Побег из Кинопоиска завершился успешно! Скачай файл с оценками и импортируй из на Letterboxd вот по [этой инструкции](https://letterboxd.com/import/).');
   lines.push('');
   lines.push(`• Всего записей в загруженном профиле Кинопоиска: ${stats.totalEntries}`);
   lines.push(`• Из них на Letterboxd попадут: ${stats.exportableCount}`);
@@ -59,8 +59,7 @@ function buildStatsMessage(stats: ExportStats): string {
 
   if (stats.skippedCount > 0) {
     lines.push('');
-    lines.push('Экспортировать получилось не все. Давай разбираться!');
-    lines.push(`• Всего пропущено записей: ${stats.skippedCount}`);
+    lines.push(`Экспортировать получилось не все. Всего пропущено записей: ${stats.skippedCount}. Из них:`);
 
     if (stats.seriesCount !== 0) {
       lines.push(`• Сериалы не поддерживаются Letterboxd, их в твоем профиле: ${stats.seriesCount}`);

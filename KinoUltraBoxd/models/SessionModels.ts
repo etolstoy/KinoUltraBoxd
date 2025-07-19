@@ -42,6 +42,8 @@ export interface SelectionState {
   selectionQueue: number[];
   /** Cursor within `selectionQueue` that points to the current film */
   currentIdx: number;
+  /** Telegram message ids of the poster(s) sent for the current film – used for cleanup */
+  posterMessageIds?: number[];
 }
 
 /**
