@@ -1,4 +1,4 @@
-import { parseKinopoiskIdsFromHtmlFiles } from '../htmlParsingService';
+import { parseKinopoiskIdsFromHtmlFiles } from '../services/htmlParsingService';
 import { FilmData } from '../models/FilmData';
 import * as fs from 'fs';
 import * as path from 'path';

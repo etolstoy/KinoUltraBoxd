@@ -1,5 +1,6 @@
+// filmProcessingService.ts (moved to services folder)
 import { parseKinopoiskIdsFromHtmlFiles } from './htmlParsingService';
-import { FilmData } from './models/FilmData';
+import { FilmData } from '../models/FilmData';
 import { attachImdbIds } from './localImdbService';
 import { attachTmdbIds } from './wikiDataService';
 import { attachTmdbIdsViaSearch } from './tmdbSearchService';

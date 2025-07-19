@@ -1,5 +1,6 @@
+// htmlParsingService.ts (moved to services folder)
 import * as cheerio from 'cheerio';
-import { FilmData } from './models/FilmData';
+import { FilmData } from '../models/FilmData';
 
 /**
  * Parses provided HTML files and extracts kinopoiskIds from valid Kinopoisk pages.

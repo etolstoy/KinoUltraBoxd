@@ -2,7 +2,7 @@ import path from 'path';
 // @ts-ignore - better-sqlite3 provides its own typings but may not be picked up in some editors
 import Database from 'better-sqlite3';
 
-import { FilmData } from './models/FilmData';
+import { FilmData } from '../models/FilmData';
 
 /**
  * Enriches parsed films with IMDb identifiers using the local SQLite database.

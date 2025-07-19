@@ -1,8 +1,8 @@
 import fs from 'fs';
 import path from 'path';
 
-import { parseKinopoiskIdsFromHtmlFiles } from '../htmlParsingService';
-import { attachImdbIds } from '../localImdbService';
+import { parseKinopoiskIdsFromHtmlFiles } from '../services/htmlParsingService';
+import { attachImdbIds } from '../services/localImdbService';
 
 describe('localImdbService.attachImdbIds (real DB, parsed from ideal.html)', () => {
   const htmlPath = path.resolve(__dirname, 'ideal.html');

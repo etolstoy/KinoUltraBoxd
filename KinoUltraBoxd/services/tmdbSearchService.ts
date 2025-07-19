@@ -1,15 +1,11 @@
 import axios from 'axios';
-import { FilmData, PotentialMatch } from './models/FilmData';
+import { FilmData, PotentialMatch } from '../models/FilmData';
 
 /**
  * Very small wrapper around TMDB "search/movie" API – it searches a movie by
  * title and (optionally) release year, returning the *most* popular match.
  *
- * The implementation purposefully keeps the surface minimal yet robust:
- *   – It handles rate-limit or network errors gracefully, never throwing – the
- *     pipeline continues even if TMDB is temporarily unavailable.
- *   – It respects the always-applied workspace rule to keep sensitive data in
- *     the environment.  Provide your v3 access token via `TMDB_ACCESS_TOKEN`.
+ * Handles rate-limit errors gracefully and respects environment configuration.
  */
 const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
 
@@ -57,10 +53,9 @@ async function searchOnce(title: string, year: number | null): Promise<TmdbMovie
 }
 
 /**
- * Returns a TMDB identifier for the supplied title/year pair, or null.
+ * Collects up to 9 unique potential matches across ±1 year window.
  */
 async function collectPotentialMatches(title: string, year: number | null): Promise<PotentialMatch[]> {
-  // Build list of years to try: target, +1, -1.
   const yearsToTry: (number | null)[] = [];
   if (year != null) {
     yearsToTry.push(year, year + 1, year - 1);
@@ -77,7 +72,7 @@ async function collectPotentialMatches(title: string, year: number | null): Prom
 
   if (results.length === 0) return [];
 
-  // Remove duplicates by id.
+  // Deduplicate by id.
   const unique = new Map<number, TmdbMovie>();
   for (const movie of results) unique.set(movie.id, movie);
 
@@ -94,12 +89,9 @@ async function collectPotentialMatches(title: string, year: number | null): Prom
 
 /**
  * Enriches FilmData objects with TMDB identifiers resolved via the search API.
- *
- * The function NEVER mutates its input – it always returns brand-new objects
- * to keep calling code purely functional.
+ * Returns brand-new objects – never mutates the input array.
  */
 export async function attachTmdbIdsViaSearch(films: FilmData[]): Promise<FilmData[]> {
-  // Fast-exit when token is unavailable.
   const token = getTmdbToken();
   if (!token) {
     console.warn('[tmdbSearchService] TMDB_API_KEY not provided – skipping search enrichment');
