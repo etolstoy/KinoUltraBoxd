@@ -91,7 +91,7 @@ async function processQueuedFiles(ctx: Context, session: BotSessionState): Promi
       const processedCount = films.filter((f) => f.tmdbId != null || f.imdbId != null).length;
       const manualCount = films.filter((f) => f.type === 'film' && f.tmdbId == null && f.imdbId == null).length;
       const keyboard = Markup.inlineKeyboard([
-        [Markup.button.callback('🙋‍♂️ Выбрать вручную', 'manual_start')],
+        [Markup.button.callback('✅ Погнали разбираться', 'manual_start')],
         [Markup.button.callback('🛑 Пропустить все', 'skip_all')],
       ]);
 

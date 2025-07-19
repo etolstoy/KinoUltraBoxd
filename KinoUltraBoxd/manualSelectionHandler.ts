@@ -22,20 +22,20 @@ async function promptSingleMatch(
 ): Promise<void> {
   const filmYearPart = film.year ? `(${film.year})` : '';
   const matchYearPart = match.year ? `(${match.year})` : '';
-  const descrPart = match.description ? ` – ${match.description}` : '';
+  const descrPart = match.description ? `\n${match.description}` : '';
 
-  const header = `Я нашел только одно подходящее совпадение с ${film.title} ${filmYearPart}:`;
-  const candidateLine = `${match.title} ${matchYearPart}${descrPart}`;
+  const header = `👀 Я нашел только одно подходящее совпадение для *[${film.title} ${filmYearPart}](${film.kinopoiskUrl})*`;
+  const candidateLine = `[${match.title} ${matchYearPart}](${match.tmdbUrl})\n${descrPart}`;
 
   const keyboardButtons: any[] = [
-    [Markup.button.callback('✅Да, это он', `single_yes_${filmIdx}`)],
-    [Markup.button.callback('❌Нет, это не он', `single_no_${filmIdx}`)],
+    [Markup.button.callback('✅ Да, это он', `single_yes_${filmIdx}`)],
+    [Markup.button.callback('❌ Нет, это не он', `single_no_${filmIdx}`)],
   ];
 
   if (allowSkipAll) {
     // Add a dedicated row for skipping the rest of the queue
     keyboardButtons.push([
-      Markup.button.callback('🛑Пропустить все', 'skip_all'),
+      Markup.button.callback('🛑 Пропустить все', 'skip_all'),
     ]);
   }
 
@@ -51,13 +51,14 @@ async function promptMultiMatch(
   matches: PotentialMatch[],
   allowSkipAll: boolean, // NEW PARAM
 ): Promise<void> {
+  const filmYearPart = film.year ? `(${film.year})` : '';
   const lines: string[] = [
-    `Пожалуйста, выберите правильный вариант для записи с кинопоиска для фильма "${film.title}"`,
+    `👀 Я нашел несколько подходящих совпадений для *[${film.title} ${filmYearPart}](${film.kinopoiskUrl})*`,
   ];
   matches.forEach((m, idx) => {
     const yearPart = m.year ? `(${m.year})` : '';
-    const descrPart = m.description ? ` – ${m.description}` : '';
-    lines.push(`${idx + 1}. ${m.title} ${yearPart}${descrPart}`);
+    const descrPart = m.description ? `\n${m.description}` : '';
+    lines.push(`${idx + 1}. [${m.title} ${yearPart}](${m.tmdbUrl})${descrPart}`);
   });
 
   const numberButtons = matches.map((_, idx) =>
@@ -72,11 +73,11 @@ async function promptMultiMatch(
   }
 
   // Row with single-film skip
-  keyboardRows.push([Markup.button.callback('❌Пропустить', `multi_skip_${filmIdx}`)]);
+  keyboardRows.push([Markup.button.callback('❌ Пропустить', `multi_skip_${filmIdx}`)]);
 
   // Row with skip-all when allowed
   if (allowSkipAll) {
-    keyboardRows.push([Markup.button.callback('🛑Пропустить все', 'skip_all')]);
+    keyboardRows.push([Markup.button.callback('🛑 Пропустить все', 'skip_all')]);
   }
 
   const keyboard = Markup.inlineKeyboard(keyboardRows);
@@ -113,7 +114,7 @@ export async function promptNextFilm(ctx: Context): Promise<void> {
   const matches = film.potentialMatches ?? [];
 
   const remaining = state.selectionQueue.length - state.currentIdx;
-  const allowSkipAll = remaining > 3; // Show global skip when >3 films remain
+  const allowSkipAll = remaining > 1; // Show global skip when >3 films remain
 
   if (matches.length === 1) {
     await promptSingleMatch(ctx, filmIdx, film, matches[0], allowSkipAll);
@@ -167,7 +168,7 @@ export function registerSelectionHandler(
     state.currentIdx += 1;
     session.selection = state;
     await saveState(userId, session);
-    await ctx.answerCbQuery('✅ Выбран вариант сохранён');
+    await ctx.answerCbQuery('✅ Выбранный вариант сохранён');
 
     // Remove the message with matches list before sending the next one to keep chat clean
     try {
@@ -211,7 +212,7 @@ export function registerSelectionHandler(
     state.currentIdx += 1;
     session.selection = state;
     await saveState(userId, session);
-    await ctx.answerCbQuery('✅ Выбран вариант сохранён');
+    await ctx.answerCbQuery('✅ Выбранный вариант сохранён');
 
     // Remove the message before prompting next
     try {
@@ -282,8 +283,8 @@ export function registerSelectionHandler(
     } catch { /* ignore if already removed */ }
 
     const confirmKeyboard = Markup.inlineKeyboard([
-      [Markup.button.callback('🤔Нет, давай разберусь сейчас', 'skip_all_cancel')],
-      [Markup.button.callback('🛑Точно пропускаем', 'skip_all_confirm')],
+      [Markup.button.callback('🤔 Нет, давай разберусь сейчас', 'skip_all_cancel')],
+      [Markup.button.callback('🛑 Точно пропускаем', 'skip_all_confirm')],
     ]);
 
     await ctx.reply(
