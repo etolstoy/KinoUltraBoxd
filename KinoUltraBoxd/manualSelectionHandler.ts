@@ -156,7 +156,11 @@ export function registerSelectionHandler(
 
     // Apply chosen match to FilmData
     film.title = match.title;
-    film.year = match.year;
+    // Overwrite year only if the match contains a concrete value – this avoids accidentally wiping
+    // out an existing year when TMDB entry lacks a release date
+    if (match.year != null) {
+      film.year = match.year;
+    }
     if (match.tmdbId != null) {
       film.tmdbId = match.tmdbId;
     }
@@ -198,7 +202,9 @@ export function registerSelectionHandler(
 
     // Apply chosen match to FilmData (same as multiple-choice branch)
     film.title = match.title;
-    film.year = match.year;
+    if (match.year != null) {
+      film.year = match.year;
+    }
     if (match.tmdbId != null) {
       film.tmdbId = match.tmdbId;
     }
