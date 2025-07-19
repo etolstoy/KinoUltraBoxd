@@ -1,6 +1,8 @@
 {
   "version": 2,
-  "routes": [
-    { "src": "/api/webhook", "dest": "api/webhook.ts" }
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "builds": [
+    { "src": "api/**/*.ts", "use": "@vercel/node" }
   ]
 } 
