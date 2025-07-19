@@ -97,8 +97,7 @@ export async function promptNextFilm(ctx: Context): Promise<void> {
 
   // Completed all selections → cleanup and notify user
   if (state.currentIdx >= state.selectionQueue.length) {
-    // Inform user that manual disambiguation is finished
-    await ctx.reply('🎉 Все фильмы обработаны. Спасибо!');
+    // All films processed – no additional user-facing message to keep the chat clean
 
     // Clear selection state first, so the callback sees a clean session if needed
     await sessionManager.clearSelection(userId);
@@ -278,6 +277,11 @@ export function registerSelectionHandler(
   bot.action('skip_all', async (ctx) => {
     await ctx.answerCbQuery();
 
+    // Delete the message that contained the original "skip all / manual" prompt
+    try {
+      await ctx.deleteMessage();
+    } catch { /* ignore if already removed */ }
+
     const confirmKeyboard = Markup.inlineKeyboard([
       [Markup.button.callback('🤔Нет, давай разберусь сейчас', 'skip_all_cancel')],
       [Markup.button.callback('🛑Точно пропускаем', 'skip_all_confirm')],
@@ -287,6 +291,18 @@ export function registerSelectionHandler(
       'Если не хочешь разбираться с совпадениями сейчас, можешь пропустить все фильмы. Не переживай – я пришлю их список отдельным файлом, и ты сможешь потом добавить их вручную на Letterboxd',
       confirmKeyboard,
     );
+  });
+
+  // ------- Start manual selection from the initial prompt --------------
+  bot.action('manual_start', async (ctx) => {
+    await ctx.answerCbQuery();
+
+    // Remove initial prompt to keep chat tidy
+    try {
+      await ctx.deleteMessage();
+    } catch { /* ignore */ }
+
+    await promptNextFilm(ctx);
   });
 
   // ------- Cancel skipping all ------------------------------------------

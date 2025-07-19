@@ -1,9 +1,9 @@
-import { Telegraf, Context } from 'telegraf';
+import { Telegraf, Context, Markup } from 'telegraf';
 import { Message } from 'telegraf/typings/core/types/typegram';
 import * as dotenv from 'dotenv';
 import { downloadHtmlFiles } from './services/telegramFileService';
 import { process as processFilms } from './services/filmProcessingService';
-import { promptNextFilm, registerSelectionHandler } from './manualSelectionHandler';
+import { registerSelectionHandler } from './manualSelectionHandler';
 import { BotSessionState } from './models/SessionModels';
 import { sessionManager } from './services/sessionManager';
 import { buildStatsReport } from './services/statsReportService';
@@ -64,7 +64,7 @@ async function processQueuedFiles(ctx: Context, session: BotSessionState): Promi
     return;
   }
 
-  await ctx.reply(`Processing ${queue.file_ids.length} file(s)...`);
+  // Suppress noisy progress message – keep chat concise while processing files
 
   let htmlContents: string[] = [];
   try {
@@ -92,8 +92,14 @@ async function processQueuedFiles(ctx: Context, session: BotSessionState): Promi
       // Inform user about auto-processed films vs those requiring manual disambiguation
       const processedCount = films.filter((f) => f.tmdbId != null || f.imdbId != null).length;
       const manualCount = films.filter((f) => f.type === 'film' && f.tmdbId == null && f.imdbId == null).length;
+      const keyboard = Markup.inlineKeyboard([
+        [Markup.button.callback('🙋‍♂️Выбрать вручную', 'manual_start')],
+        [Markup.button.callback('🛑Пропустить все', 'skip_all')],
+      ]);
+
       await ctx.reply(
-        `👍Хорошие новости – я автоматически обработал ${processedCount} фильмов, и они уже готовы к импорту на Letterboxd! Но есть вопросики к ${manualCount} фильмов, нужна твоя помощь. Я покажу тебе карточки со всеми совпадениями, которые я нашел, а ты выберешь правильные.`,
+        `👍Хорошие новости – я автоматически обработал ${processedCount} фильмов, и они уже готовы к импорту на Letterboxd! Но есть вопросики к ${manualCount} фильмов, нужна твоя помощь. Что будем делать?`,
+        keyboard,
       );
 
       session.selection = {
@@ -102,7 +108,6 @@ async function processQueuedFiles(ctx: Context, session: BotSessionState): Promi
         currentIdx: 0,
       };
       await saveState(ctx.from!.id, session);
-      await promptNextFilm(ctx);
     }
 
     // Success → clear queue
