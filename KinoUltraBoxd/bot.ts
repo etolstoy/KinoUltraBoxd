@@ -82,6 +82,13 @@ async function processQueuedFiles(ctx: Context, session: BotSessionState): Promi
       await sessionManager.clearSelection(ctx.from!.id);
     } else {
       // Save state and start interactive selection
+      // Inform user about auto-processed films vs those requiring manual disambiguation
+      const processedCount = films.filter((f) => f.tmdbId != null || f.imdbId != null).length;
+      const manualCount = films.filter((f) => f.type === 'film' && f.tmdbId == null && f.imdbId == null).length;
+      await ctx.reply(
+        `👍Хорошие новости – я автоматически обработал ${processedCount} фильмов, и они уже готовы к импорту на Letterboxd! Но есть вопросики к ${manualCount} фильмов, нужна твоя помощь. Я покажу тебе карточки со всеми совпадениями, которые я нашел, а ты выберешь правильные.`,
+      );
+
       session.selection = {
         films,
         selectionQueue: needManual.map(({ idx }) => idx),

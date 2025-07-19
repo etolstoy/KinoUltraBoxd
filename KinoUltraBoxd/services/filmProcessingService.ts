@@ -62,10 +62,10 @@ export async function process(htmlFiles: string[], kinopoiskToken?: string): Pro
   );
 
   // ---------- 2. IMDb enrichment ----------
-  // await enrichStage('IMDb enrichment', filmMap, (films) => attachImdbIds(films));
+   await enrichStage('IMDb enrichment', filmMap, (films) => attachImdbIds(films));
 
   // ---------- 3. TMDB enrichment (WikiData) ----------
-  //await enrichStage('TMDB enrichment (WikiData)', filmMap, attachTmdbIds);
+  await enrichStage('TMDB enrichment (WikiData)', filmMap, attachTmdbIds);
 
   // ---------- 4. TMDB enrichment (Kinopoisk.dev) ----------
   await enrichStage('TMDB enrichment (Kinopoisk.dev)', filmMap, (films) => attachTmdbIdsViaKinopoisk(films, kinopoiskToken));
