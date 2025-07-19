@@ -5,7 +5,9 @@ import { downloadHtmlFiles } from './services/telegramFileService';
 import { process as processFilms } from './services/filmProcessingService';
 import { promptNextFilm, registerSelectionHandler } from './manualSelectionHandler';
 import { BotSessionState } from './models/SessionModels';
-import { sessionManager } from './services/SessionManager';
+import { sessionManager } from './services/sessionManager';
+import { buildStatsReport } from './services/statsReportService';
+import { FilmData } from './models/FilmData';
 
 dotenv.config();
 
@@ -17,8 +19,18 @@ bot.start((ctx: Context) => ctx.reply('Hello'));
 const loadState = (userId: number) => sessionManager.get(userId);
 const saveState = (userId: number, state: BotSessionState) => sessionManager.set(userId, state);
 
+// ---------------- Helper ----------------
+async function sendStatsReport(ctx: Context, films: FilmData[]): Promise<void> {
+  const report = buildStatsReport(films);
+  await ctx.reply(report.message);
+  if (report.notFoundFilms && report.notFoundFilms.length > 0) {
+    const buffer = Buffer.from(report.notFoundFilms.join('\n'), 'utf-8');
+    await ctx.replyWithDocument({ source: buffer, filename: 'not_found_films.txt' });
+  }
+}
+
 // Register manual selection handler
-registerSelectionHandler(bot);
+registerSelectionHandler(bot, sendStatsReport);
 
 bot.on('document', async (ctx: Context) => {
   const doc = (ctx.message as Message.DocumentMessage).document;
@@ -66,7 +78,7 @@ async function processQueuedFiles(ctx: Context, session: BotSessionState): Promi
       .filter(({ film }) => film.potentialMatches && film.potentialMatches.length > 0);
 
     if (needManual.length === 0) {
-      await ctx.reply(`✅ Processed ${films.length} entries. No manual selection needed.`);
+      await sendStatsReport(ctx, films);
       await sessionManager.clearSelection(ctx.from!.id);
     } else {
       // Save state and start interactive selection

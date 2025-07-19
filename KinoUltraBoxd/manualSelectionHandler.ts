@@ -1,7 +1,11 @@
 import { Telegraf, Context, Markup } from 'telegraf';
 import { BotSessionState } from './models/SessionModels';
 import { FilmData, PotentialMatch } from './models/FilmData';
-import { sessionManager } from './services/SessionManager';
+import { sessionManager } from './services/sessionManager';
+// Completion callback will be supplied by bot.ts -- allows decoupling orchestration
+
+// Callback provided by the bot layer; invoked once the user finishes all selections
+let onSelectionComplete: ((ctx: Context, films: FilmData[]) => Promise<void> | void) | undefined;
 
 // Local helpers to access the persisted session state
 const loadState = (userId: number) => sessionManager.get(userId);
@@ -73,8 +77,16 @@ export async function promptNextFilm(ctx: Context): Promise<void> {
 
   // Completed all selections → cleanup and notify user
   if (state.currentIdx >= state.selectionQueue.length) {
+    // Inform user that manual disambiguation is finished
     await ctx.reply('🎉 Все фильмы обработаны. Спасибо!');
+
+    // Clear selection state first, so the callback sees a clean session if needed
     await sessionManager.clearSelection(userId);
+
+    // Let the orchestrator know that we're done and pass enriched film list
+    if (onSelectionComplete) {
+      await onSelectionComplete(ctx, state.films);
+    }
     return;
   }
 
@@ -94,7 +106,11 @@ export async function promptNextFilm(ctx: Context): Promise<void> {
  * Registers the inline-button callback with the supplied Telegraf instance so
  * users can select a film during the manual disambiguation wizard.
  */
-export function registerSelectionHandler(bot: Telegraf<Context>): void {
+export function registerSelectionHandler(
+  bot: Telegraf<Context>,
+  onComplete?: (ctx: Context, films: FilmData[]) => Promise<void> | void,
+): void {
+  onSelectionComplete = onComplete;
   bot.action(/^choose_(\d+)_(\d+)$/, async (ctx) => {
     const userId = ctx.from?.id;
     if (!userId) return;
