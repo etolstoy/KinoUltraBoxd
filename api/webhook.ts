@@ -12,7 +12,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    await bot.handleUpdate(req.body as any);
+    const update = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+    await bot.handleUpdate(update as any);
     res.status(200).send('OK');
   } catch (err) {
     console.error('[webhook] failed to handle update', err);
