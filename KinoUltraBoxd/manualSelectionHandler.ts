@@ -46,7 +46,14 @@ async function promptMultiMatch(
   });
 
   const keyboard = Markup.inlineKeyboard(
-    matches.map((_, idx) => Markup.button.callback(String(idx + 1), `choose_${filmIdx}_${idx}`)),
+    [
+      // Numerical choice buttons
+      ...matches.map((_, idx) =>
+        Markup.button.callback(String(idx + 1), `choose_${filmIdx}_${idx}`),
+      ),
+      // Extra row with a "skip" button so user can ignore this film
+      Markup.button.callback('❌Пропустить', `multi_skip_${filmIdx}`),
+    ],
     { columns: 3 },
   );
 
@@ -191,6 +198,33 @@ export function registerSelectionHandler(bot: Telegraf<Context>): void {
     try {
       await ctx.deleteMessage();
     } catch {/* ignore */}
+
+    await promptNextFilm(ctx);
+  });
+
+  // ------- Skip button handler for MULTI-selection -----------------------
+  bot.action(/^multi_skip_(\d+)$/, async (ctx) => {
+    const userId = ctx.from?.id;
+    if (!userId) return;
+    const session = await loadState(userId);
+    const state = session.selection;
+    if (!state) {
+      await ctx.answerCbQuery('Нет активного выбора.');
+      return;
+    }
+
+    // Simply skip enrichment for this film (same logic as single_no)
+    state.currentIdx += 1;
+    session.selection = state;
+    await saveState(userId, session);
+    await ctx.answerCbQuery('⏭️ Пропущено');
+
+    // Remove the message with matches before moving on
+    try {
+      await ctx.deleteMessage();
+    } catch {
+      /* ignore if deletion fails */
+    }
 
     await promptNextFilm(ctx);
   });
