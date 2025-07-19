@@ -275,22 +275,31 @@ export function registerSelectionHandler(
 
   // ------- Skip ALL remaining films (initial prompt) ---------------------
   bot.action('skip_all', async (ctx) => {
-    await ctx.answerCbQuery();
+    const userId = ctx.from?.id;
+    if (!userId) return;
 
-    // Delete the message that contained the original "skip all / manual" prompt
+    const session = await loadState(userId);
+    const state = session.selection;
+    if (!state) {
+      await ctx.answerCbQuery('Нет активного выбора.');
+      return;
+    }
+
+    // Acknowledge button press and provide immediate feedback
+    await ctx.answerCbQuery('⏭️ Все оставшиеся фильмы пропущены');
+
+    // Remove the message that contained the original "skip all / manual" prompt
     try {
       await ctx.deleteMessage();
     } catch { /* ignore if already removed */ }
 
-    const confirmKeyboard = Markup.inlineKeyboard([
-      [Markup.button.callback('🤔 Нет, давай разберусь сейчас', 'skip_all_cancel')],
-      [Markup.button.callback('🛑 Точно пропускаем', 'skip_all_confirm')],
-    ]);
+    // Mark all remaining selections as processed by moving cursor to the end
+    state.currentIdx = state.selectionQueue.length;
+    session.selection = state;
+    await saveState(userId, session);
 
-    await ctx.reply(
-      'Если не хочешь разбираться с совпадениями сейчас, можешь пропустить все фильмы. Не переживай – я пришлю их список отдельным файлом, и ты сможешь потом добавить их вручную на Letterboxd',
-      confirmKeyboard,
-    );
+    // Proceed straight to the final phase (stats report generation)
+    await promptNextFilm(ctx);
   });
 
   // ------- Start manual selection from the initial prompt --------------
