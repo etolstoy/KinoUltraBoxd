@@ -1,8 +1,9 @@
-import { Telegraf, Context, Markup } from 'telegraf';
+import { Telegraf, Context } from 'telegraf';
 import { Message } from 'telegraf/typings/core/types/typegram';
 import * as dotenv from 'dotenv';
 import { downloadHtmlFiles } from './services/telegramFileService';
 import { process as processFilms } from './services/filmProcessingService';
+import { promptNextFilm, registerSelectionHandler } from './manualSelectionHandler';
 import { BotSessionState, FileQueue, SelectionState } from './models/SessionModels';
 import { sessionManager } from './services/SessionManager';
 
@@ -16,42 +17,8 @@ bot.start((ctx: Context) => ctx.reply('Hello'));
 const loadState = (userId: number) => sessionManager.get(userId);
 const saveState = (userId: number, state: BotSessionState) => sessionManager.set(userId, state);
 
-// Helper to prompt user to choose a match for the current film
-async function promptNextFilm(ctx: Context) {
-  const userId = ctx.from?.id;
-  if (!userId) return;
-  const session = await loadState(userId);
-  const state = session.selection;
-  if (!state) return;
-
-  // Completed all selections → cleanup and notify user
-  if (state.currentIdx >= state.selectionQueue.length) {
-    await ctx.reply('🎉 Все фильмы обработаны. Спасибо!');
-    await sessionManager.clearSelection(userId);
-    return;
-  }
-
-  const filmIdx = state.selectionQueue[state.currentIdx];
-  const film = state.films[filmIdx];
-  const matches = film.potentialMatches ?? [];
-  // Compose message body
-  const lines: string[] = [
-    `Пожалуйста, выберите правильный вариант для записи с кинопоиска для фильма "${film.title}"`,
-  ];
-  matches.forEach((m, idx) => {
-    const yearPart = m.year ? `(${m.year})` : '';
-    const descrPart = m.description ? ` – ${m.description}` : '';
-    lines.push(`${idx + 1}. ${m.title} ${yearPart}${descrPart}`);
-  });
-
-  // Build inline keyboard: one button per match (max 9)
-  const keyboard = Markup.inlineKeyboard(
-    matches.map((_, idx) => Markup.button.callback(String(idx + 1), `choose_${filmIdx}_${idx}`)),
-    { columns: 3 },
-  );
-
-  await ctx.reply(lines.join('\n'), keyboard);
-}
+// Register manual selection handler
+registerSelectionHandler(bot);
 
 bot.on('document', async (ctx: Context) => {
   const doc = (ctx.message as Message.DocumentMessage).document;
@@ -121,50 +88,6 @@ bot.hears(/^go$/i, async (ctx: Context) => {
   // Clear the queue after processing
   session.fileQueue = { file_ids: [], file_names: [] };
   await saveState(userId, session);
-});
-
-// Handle inline button selection
-bot.action(/^choose_(\d+)_(\d+)$/, async (ctx) => {
-  const userId = ctx.from?.id;
-  if (!userId) return;
-  const session = await loadState(userId);
-  const state = session.selection;
-  if (!state) {
-    await ctx.answerCbQuery('Нет активного выбора.');
-    return;
-  }
-
-  const filmIdx = Number(ctx.match[1]);
-  const matchIdx = Number(ctx.match[2]);
-
-  const film = state.films[filmIdx];
-  const match = film.potentialMatches?.[matchIdx];
-  if (!match) {
-    await ctx.answerCbQuery('Неверный выбор.');
-    return;
-  }
-
-  // Apply chosen match to FilmData
-  film.title = match.title;
-  film.year = match.year;
-  // Update TMDB id if present (used later in pipeline)
-  if (match.tmdbId != null) {
-    film.tmdbId = match.tmdbId;
-  }
-
-  // Advance state and prompt next film (if any)
-  state.currentIdx += 1;
-  session.selection = state;
-  await saveState(userId, session);
-  await ctx.answerCbQuery('✅ Выбран вариант сохранён');
-
-  // Remove keyboard from the message user interacted with to keep chat clean
-  try {
-    await ctx.editMessageReplyMarkup(undefined);
-  } catch { /* message might be already edited */ }
-
-  // Prompt next film or finish
-  await promptNextFilm(ctx);
 });
 
 bot.launch();
