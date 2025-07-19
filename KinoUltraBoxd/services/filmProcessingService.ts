@@ -4,6 +4,7 @@ import { FilmData } from '../models/FilmData';
 import { attachImdbIds } from './localImdbService';
 import { attachTmdbIds } from './wikiDataService';
 import { attachTmdbIdsViaSearch } from './tmdbSearchService';
+import { attachTmdbIdsViaKinopoisk } from './kinopoiskDevService';
 
 // Helper type representing any enrichment function (sync or async)
 type EnrichFn = (films: FilmData[]) => Promise<FilmData[]> | FilmData[];
@@ -51,7 +52,7 @@ async function enrichStage(
  * The function does not mutate its input – it works with shallow copies and
  * returns a brand-new array.
  */
-export async function process(htmlFiles: string[]): Promise<FilmData[]> {
+export async function process(htmlFiles: string[], kinopoiskToken?: string): Promise<FilmData[]> {
   // ---------- 1. Parse Kinopoisk pages ----------
   const parsedFilms = parseKinopoiskIdsFromHtmlFiles(htmlFiles);
 
@@ -61,12 +62,15 @@ export async function process(htmlFiles: string[]): Promise<FilmData[]> {
   );
 
   // ---------- 2. IMDb enrichment ----------
-  await enrichStage('IMDb enrichment', filmMap, (films) => attachImdbIds(films));
+  // await enrichStage('IMDb enrichment', filmMap, (films) => attachImdbIds(films));
 
   // ---------- 3. TMDB enrichment (WikiData) ----------
-  await enrichStage('TMDB enrichment (WikiData)', filmMap, attachTmdbIds);
+  //await enrichStage('TMDB enrichment (WikiData)', filmMap, attachTmdbIds);
 
-  // ---------- 4. TMDB enrichment (Search API) ----------
+  // ---------- 4. TMDB enrichment (Kinopoisk.dev) ----------
+  await enrichStage('TMDB enrichment (Kinopoisk.dev)', filmMap, (films) => attachTmdbIdsViaKinopoisk(films, kinopoiskToken));
+
+  // ---------- 5. TMDB enrichment (TMDB Search) ----------
   await enrichStage('TMDB enrichment (TMDB Search)', filmMap, attachTmdbIdsViaSearch);
 
   const finalFilms = [...filmMap.values()];

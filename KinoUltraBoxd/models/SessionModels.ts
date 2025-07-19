@@ -55,4 +55,8 @@ export interface BotSessionState {
   fileQueue: FileQueue;
   /** Defined only when the manual-selection wizard is active */
   selection?: SelectionState;
+  /** Optional Kinopoisk.dev API token supplied by the user */
+  kinopoiskToken?: string;
+  /** Indicates that the bot is waiting for the user to send their Kinopoisk token */
+  awaitingKinopoiskToken?: boolean;
 } 
