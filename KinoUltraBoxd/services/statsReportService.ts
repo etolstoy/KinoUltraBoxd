@@ -59,7 +59,7 @@ function buildStatsMessage(stats: ExportStats): string {
 
   if (stats.skippedCount > 0) {
     lines.push('');
-    lines.push(`Экспортировать получилось не все. Всего пропущено записей: ${stats.skippedCount}. Из них:`);
+    lines.push(`Экспортировать получилось не все:`);
 
     if (stats.seriesCount !== 0) {
       lines.push(`• Сериалы: ${stats.seriesCount}`);
