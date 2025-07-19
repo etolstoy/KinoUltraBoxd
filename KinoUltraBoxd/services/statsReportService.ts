@@ -62,8 +62,8 @@ function buildStatsMessage(stats: ExportStats): string {
     lines.push(`Экспортировать получилось не все. Всего пропущено записей: ${stats.skippedCount}. Из них:`);
 
     if (stats.seriesCount !== 0) {
-      lines.push(`• Сериалы не поддерживаются Letterboxd, их в твоем профиле: ${stats.seriesCount}`);
-      lines.push('Можешь попробовать переехать с ними на сервис MyShows.');
+      lines.push(`• Сериалы: ${stats.seriesCount}`);
+      lines.push('Letterboxd не поддерживает сериалы. Можешь попробовать переехать с ними на сервис MyShows.');
     }
 
     if (stats.unmatchedFilmCount !== 0) {
@@ -86,10 +86,34 @@ export function buildStatsReport(
   const message = buildStatsMessage(stats);
 
   let notFoundFilms: string[] | undefined;
-  if (stats.unmatchedFilmCount > 0) {
-    notFoundFilms = films
-      .filter((f) => f.type === 'film' && f.imdbId == null && f.tmdbId == null)
-      .map((f) => `${f.title}${f.year != null ? ` (${f.year})` : ''}`);
+  if (stats.unmatchedFilmCount > 0 || stats.seriesCount > 0) {
+    // Build a single Markdown file with two sections: Films and Series
+    notFoundFilms = [];
+
+    const appendEntry = (f: FilmData) => {
+      notFoundFilms!.push(`## ${f.title}`);
+      notFoundFilms!.push(`Тип: ${f.type}`);
+      notFoundFilms!.push(`Год выпуска: ${f.year != null ? f.year : '—'}`);
+      notFoundFilms!.push(`Идентификатор на Кинопоиске: ${f.kinopoiskId}`);
+      notFoundFilms!.push(`Ваша оценка: ${f.rating != null ? f.rating : '—'}`);
+      notFoundFilms!.push(`Дата просмотра: ${f.watchDate ?? '—'}`);
+      notFoundFilms!.push(''); // readability spacer
+    };
+
+    if (stats.unmatchedFilmCount > 0) {
+      notFoundFilms.push('# Films');
+      notFoundFilms.push('');
+      films
+        .filter((f) => f.type === 'film' && f.imdbId == null && f.tmdbId == null)
+        .forEach(appendEntry);
+    }
+
+    if (stats.seriesCount > 0) {
+      notFoundFilms.push('# Series');
+      notFoundFilms.push('');
+      // List all series (Letterboxd does not support series at all)
+      films.filter((f) => f.type === 'series').forEach(appendEntry);
+    }
   }
 
   return { message, notFoundFilms, stats };
