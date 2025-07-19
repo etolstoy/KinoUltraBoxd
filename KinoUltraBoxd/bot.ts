@@ -12,7 +12,7 @@ import { FilmData } from './models/FilmData';
 
 dotenv.config();
 
-const bot = new Telegraf(process.env.BOT_TOKEN as string);
+export const bot = new Telegraf(process.env.BOT_TOKEN as string);
 
 // Start command with inline "Start export" button
 bot.start(async (ctx: Context) => {
@@ -243,8 +243,12 @@ bot.on('text', async (ctx: Context) => {
   await processQueuedFiles(ctx, session);
 });
 
-bot.launch();
+if (!process.env.VERCEL) {
+  bot.launch();
 
-// Enable graceful stop
-process.once('SIGINT', () => bot.stop('SIGINT'));
-process.once('SIGTERM', () => bot.stop('SIGTERM')); 
+  // Enable graceful stop when running locally (long polling)
+  process.once('SIGINT', () => bot.stop('SIGINT'));
+  process.once('SIGTERM', () => bot.stop('SIGTERM'));
+}
+
+export default bot; 
