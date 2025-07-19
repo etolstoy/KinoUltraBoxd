@@ -130,7 +130,7 @@ async function processQueuedFiles(ctx: Context, session: BotSessionState): Promi
 
       await clearTempStatus(ctx, session);
       await ctx.reply(
-        `👍 Хорошие новости – я автоматически обработал ${processedCount} фильмов, и они уже готовы к импорту на Letterboxd!\n\nНо есть вопросики к ${manualCount} фильмов, нужна твоя помощь. Что будем делать?`,
+        `👍 Хорошие новости – я автоматически обработал ${processedCount} фильмов, и они уже готовы к импорту на Letterboxd!\n\nНо еще ${manualCount} надо обсудить с тобой. Сможешь помочь выбрать из нескольких совпадений?`,
         keyboard,
       );
 
@@ -214,7 +214,11 @@ bot.on('text', async (ctx: Context) => {
   await saveState(userId, session);
 
   await clearTempStatus(ctx, session);
-  await ctx.reply('🔐 Отлично, спасибо за токен! Продолжаю обработку файлов...');
+
+  // Send a new temporary status message while continuing processing
+  const processingMsg = await ctx.reply('🔐 Отлично, спасибо за токен! Продолжаю обработку файлов...');
+  session.tempStatusMessageId = (processingMsg as any).message_id;
+  await saveState(userId, session);
 
   // Retry processing queue automatically
   await processQueuedFiles(ctx, session);
