@@ -1,9 +1,8 @@
 import { Telegraf, Context, Markup } from 'telegraf';
 import { Message } from 'telegraf/typings/core/types/typegram';
 import * as dotenv from 'dotenv';
-import * as https from 'https';
+import { downloadHtmlFiles } from './services/telegramFileService';
 import { process as processFilms } from './services/filmProcessingService';
-import { FilmData } from './models/FilmData';
 import { BotSessionState, FileQueue, SelectionState } from './models/SessionModels';
 import { sessionManager } from './services/SessionManager';
 
@@ -83,36 +82,16 @@ bot.hears(/^go$/i, async (ctx: Context) => {
 
   await ctx.reply(`Processing ${queue.file_ids.length} file(s)...`);
 
-  const htmlContents: string[] = [];
-
-  for (let i = 0; i < queue.file_ids.length; i++) {
-    const file_id = queue.file_ids[i];
-    const file_name = queue.file_names[i];
-    try {
-      const fileLink = await ctx.telegram.getFileLink(file_id);
-      let data = '';
-      await new Promise<void>((resolve, reject) => {
-        https.get(fileLink.href, (res) => {
-          res.setEncoding('utf8');
-          res.on('data', (chunk) => {
-            data += chunk;
-          });
-          res.on('end', () => {
-            resolve();
-          });
-          res.on('error', reject);
-        }).on('error', reject);
-      });
-      htmlContents.push(data);
-      const lines = data.split(/\r?\n/);
-      const totalLines = lines.length;
-      await ctx.reply(`File: ${file_name}\nTotal lines: ${totalLines}`);
-    } catch (err) {
-      await ctx.reply(`❌ Error processing file: ${file_name}`);
-    }
+  let htmlContents: string[] = [];
+  try {
+    htmlContents = await downloadHtmlFiles(ctx.telegram, queue.file_ids);
+  } catch (err) {
+    console.error('[bot] file download failed', err);
+    await ctx.reply('❌ Не получилось скачать файлы. Попробуйте еще раз.');
+    return;
   }
 
-  // Call the film processing service with all HTML contents
+  // ---------- Process downloaded HTML ----------
   try {
     const films = await processFilms(htmlContents);
 
