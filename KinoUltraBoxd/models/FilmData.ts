@@ -6,11 +6,17 @@ export class PotentialMatch {
     public tmdbId: number | null,
     public popularity: number | null,
     public description: string | null,
+    public posterPath: string | null,
   ) {}
 
   /** Direct link to the movie page on TMDB (null when id is unavailable) */
   get tmdbUrl(): string | null {
     return this.tmdbId != null ? `https://www.themoviedb.org/movie/${this.tmdbId}` : null;
+  }
+
+  /** Full-size poster URL (w500) when posterPath is provided */
+  get posterUrl(): string | null {
+    return this.posterPath != null ? `https://image.tmdb.org/t/p/w500/${this.posterPath}` : null;
   }
 }
 

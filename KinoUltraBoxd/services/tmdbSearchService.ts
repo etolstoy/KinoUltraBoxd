@@ -20,6 +20,7 @@ interface TmdbMovie {
   popularity: number;
   release_date?: string;
   overview?: string;
+  poster_path?: string | null;
 }
 
 interface SearchResponse {
@@ -86,6 +87,7 @@ async function collectPotentialMatches(title: string, year: number | null): Prom
         m.id,
         m.popularity ?? null,
         m.overview ?? null,
+        m.poster_path ?? null,
       ),
   );
 }
