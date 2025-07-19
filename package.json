@@ -15,13 +15,15 @@
     "jest": "^30.0.4",
     "ts-jest": "^29.4.0",
     "ts-node": "^10.9.2",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "rimraf": "^5.0.5"
   },
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
     "prestart": "npm run build",
     "start": "node dist/KinoUltraBoxd/bot.js",
+    "predev": "rimraf dist",
     "dev": "ts-node KinoUltraBoxd/bot.ts",
     "test": "jest"
   },

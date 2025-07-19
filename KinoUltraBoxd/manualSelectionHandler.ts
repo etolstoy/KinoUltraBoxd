@@ -85,11 +85,12 @@ export function registerSelectionHandler(bot: Telegraf<Context>): void {
     await saveState(userId, session);
     await ctx.answerCbQuery('✅ Выбран вариант сохранён');
 
-    // Remove keyboard markup from the interacted message to keep chat clean
+    // Remove the message with matches list before sending the next one to keep chat clean
     try {
-      await ctx.editMessageReplyMarkup(undefined);
+      await ctx.deleteMessage();
+      console.log(`[manualSelectionHandler] Deleted matches list message for user ${userId}`);
     } catch {
-      /* Message might have been edited already */
+      /* Message might have been deleted already or deletion not permitted */
     }
 
     await promptNextFilm(ctx);
