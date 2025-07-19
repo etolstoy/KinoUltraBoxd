@@ -38,6 +38,16 @@ export class FilmData {
     return `https://www.kinopoisk.ru/${this.type}/${this.kinopoiskId}`;
   }
 
+  /** Direct link to the movie page on TMDB (null when tmdbId is missing) */
+  get tmdbUrl(): string | null {
+    return this.tmdbId != null ? `https://www.themoviedb.org/movie/${this.tmdbId}` : null;
+  }
+
+  /** Direct link to the movie/series page on IMDb (null when imdbId is missing) */
+  get imdbUrl(): string | null {
+    return this.imdbId != null ? `https://www.imdb.com/title/${this.imdbId}` : null;
+  }
+
   /**
    * Lightweight helper to clone an existing FilmData while overriding selected
    * fields – keeps enrichment stages concise and immutable.
