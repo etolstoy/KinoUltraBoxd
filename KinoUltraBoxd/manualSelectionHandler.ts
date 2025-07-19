@@ -97,7 +97,6 @@ export async function promptNextFilm(ctx: Context): Promise<void> {
 
   // Completed all selections → cleanup and notify user
   if (state.currentIdx >= state.selectionQueue.length) {
-    // All films processed – no additional user-facing message to keep the chat clean
 
     // Clear selection state first, so the callback sees a clean session if needed
     await sessionManager.clearSelection(userId);
