@@ -6,9 +6,7 @@
       "use": "@vercel/node",
       "config": {
         "includeFiles": [
-          "KinoUltraBoxd/services/**",
-          "KinoUltraBoxd/models/**",
-          "KinoUltraBoxd/imdb.sqlite"
+          "KinoUltraBoxd/**"
         ]
       }
     }
