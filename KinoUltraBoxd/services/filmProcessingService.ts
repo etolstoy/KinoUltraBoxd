@@ -58,7 +58,7 @@ export async function process(htmlFiles: string[], kinopoiskToken?: string): Pro
 
   // Use a map keyed by kinopoiskId, so we can merge enriched results back in.
   const filmMap = new Map<number, FilmData>(
-    parsedFilms.map((f) => [f.kinopoiskId, { ...f }]),
+    parsedFilms.map((f) => [f.kinopoiskId, FilmData.clone(f)]),
   );
 
   // ---------- 2. IMDb enrichment ----------

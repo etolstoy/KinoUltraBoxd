@@ -91,16 +91,14 @@ export function parseKinopoiskIdsFromHtmlFiles(htmlFiles: string[]): FilmData[] 
       });
 
       if (idStr && /^\d+$/.test(idStr) && entryType) {
-        const film: FilmData = {
+        const film = new FilmData(
           title,
           year,
           rating,
           watchDate,
-          kinopoiskId: Number(idStr),
-          tmdbId: null,
-          imdbId: null,
-          type: entryType,
-        };
+          entryType,
+          Number(idStr),
+        );
         results.push(film);
       }
     });

@@ -82,8 +82,8 @@ export async function attachTmdbIdsViaKinopoisk(
   return films.map((f) => {
     const found = enrichedMap.get(f.kinopoiskId);
     if (found != null) {
-      return { ...f, tmdbId: found };
+      return FilmData.clone(f, { tmdbId: found });
     }
-    return { ...f };
+    return FilmData.clone(f);
   });
 } 

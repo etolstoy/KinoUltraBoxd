@@ -40,24 +40,24 @@ export function attachImdbIds(parsedFilms: FilmData[]): FilmData[] {
   } catch (err) {
     console.error('[localImdbService] Failed to open imdb.sqlite:', err);
     // Return original objects untouched in case of any error
-    return parsedFilms.map((f) => ({ ...f }));
+    return parsedFilms.map((f) => FilmData.clone(f));
   }
 
   const stmt = db.prepare('SELECT tmdbId AS imdbId FROM kinopoisk_mapping WHERE kinopoiskId = ? LIMIT 1');
 
   const enriched = parsedFilms.map((film) => {
-    if (film.imdbId) return { ...film }; // nothing to do
+    if (film.imdbId) return FilmData.clone(film); // nothing to do
 
     try {
       const row = stmt.get(film.kinopoiskId);
       if (row && row.imdbId) {
-        return { ...film, imdbId: row.imdbId };
+        return FilmData.clone(film, { imdbId: row.imdbId });
       }
     } catch (err) {
       console.error(`[localImdbService] Lookup failed for kpId=${film.kinopoiskId}:`, err);
     }
 
-    return { ...film }; // unchanged if not found or on error
+    return FilmData.clone(film); // unchanged if not found or on error
   });
 
   // Close connection – it is cheap and keeps implementation simple.

@@ -78,13 +78,16 @@ async function collectPotentialMatches(title: string, year: number | null): Prom
 
   const sorted = [...unique.values()].sort((a, b) => b.popularity - a.popularity).slice(0, 9);
 
-  return sorted.map((m): PotentialMatch => ({
-    title: m.title,
-    year: m.release_date ? Number(m.release_date.substring(0, 4)) : null,
-    tmdbId: m.id,
-    popularity: m.popularity ?? null,
-    description: m.overview ?? null,
-  }));
+  return sorted.map(
+    (m) =>
+      new PotentialMatch(
+        m.title,
+        m.release_date ? Number(m.release_date.substring(0, 4)) : null,
+        m.id,
+        m.popularity ?? null,
+        m.overview ?? null,
+      ),
+  );
 }
 
 /**
@@ -95,12 +98,12 @@ export async function attachTmdbIdsViaSearch(films: FilmData[]): Promise<FilmDat
   const token = getTmdbToken();
   if (!token) {
     console.warn('[tmdbSearchService] TMDB_API_KEY not provided – skipping search enrichment');
-    return films.map(f => ({ ...f }));
+    return films.map(f => FilmData.clone(f));
   }
 
   const enrichedPromises = films.map(async (film) => {
     const matches = await collectPotentialMatches(film.title, film.year);
-    return { ...film, potentialMatches: matches };
+    return FilmData.clone(film, { potentialMatches: matches });
   });
 
   return Promise.all(enrichedPromises);

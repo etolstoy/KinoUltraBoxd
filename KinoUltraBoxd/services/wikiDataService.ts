@@ -69,12 +69,12 @@ export async function attachTmdbIds(films: FilmData[]): Promise<FilmData[]> {
   const mappings = await fetchTmdbMappings(uniqueIds);
 
   return films.map((film) => {
-    if (film.tmdbId != null) return { ...film };
+    if (film.tmdbId != null) return FilmData.clone(film);
 
     const mapped = mappings.get(film.kinopoiskId);
     if (mapped != null) {
-      return { ...film, tmdbId: mapped };
+      return FilmData.clone(film, { tmdbId: mapped });
     }
-    return { ...film };
+    return FilmData.clone(film);
   });
 } 
