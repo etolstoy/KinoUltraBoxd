@@ -74,6 +74,9 @@ async function sendStatsReport(ctx: Context, films: FilmData[]): Promise<void> {
     const csvBuffer = generateLetterboxdCsv(films);
     await ctx.replyWithDocument({ source: csvBuffer, filename: 'letterboxd.csv' });
   }
+
+  // NEW: Invite user to follow the bot author on Letterboxd
+  await ctx.reply('❤️ Последний шаг – подпишись на автора бота [в Letterboxd](https://boxd.it/5FBVL )!', { parse_mode: 'Markdown' });
 }
 
 // Register manual selection handler
