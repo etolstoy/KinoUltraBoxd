@@ -74,6 +74,5 @@ export async function process(htmlFiles: string[], kinopoiskToken?: string): Pro
   await enrichStage('TMDB enrichment (TMDB Search)', filmMap, attachTmdbIdsViaSearch);
 
   const finalFilms = [...filmMap.values()];
-  console.log('[filmProcessingService] Final enriched films:', finalFilms);
   return finalFilms;
 } 
