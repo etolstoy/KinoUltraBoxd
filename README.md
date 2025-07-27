@@ -2,6 +2,8 @@
 
 A Telegram bot that helps users export their movie ratings from Kinopoisk (Russian movie database) to Letterboxd format. The bot processes HTML files containing user ratings and creates a CSV file compatible with Letterboxd's import feature.
 
+You can either deploy your own bot, or use the hosted version: [@KinoBoxdBot](https://t.me/KinoBoxdBot).
+
 ## Project Purpose
 
 KinoUltraBoxd automates the migration of movie ratings from Kinopoisk to Letterboxd by:
