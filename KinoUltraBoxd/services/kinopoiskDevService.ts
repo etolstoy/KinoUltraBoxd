@@ -5,10 +5,10 @@ import { FilmData } from '../models/FilmData';
  * Very small wrapper around kinopoisk.dev API that resolves TMDB identifiers
  * for Kinopoisk films when both IMDb & TMDB are missing.
  *
- * The free developer API (https://api.kinopoisk.dev/documentation) requires an
- * X-API-KEY header that users can obtain from @kinopoiskdev_bot.
+ * The free developer API (https://api.poiskkino.dev) requires an
+ * X-API-KEY header that users can obtain from @poiskkinodev_bot.
  */
-const BASE_URL = 'https://api.kinopoisk.dev/v1.4';
+const BASE_URL = 'https://api.poiskkino.dev';
 const REQUEST_TIMEOUT = 15_000; // 15 s per request
 
 interface KinopoiskResponse {
