@@ -160,7 +160,7 @@ async function processQueuedFiles(ctx: Context, session: BotSessionState): Promi
       // Ask user for token and keep queue intact
       await clearTempStatus(ctx, session);
       const tokenRequestMsg = await ctx.reply(
-        '🙋🏻 Часть фильмов уже обработана, но найти пока получилось не все. Нам придется использовать неофициальный API Кинопоиска, для работы с которым тебе надо получить личный токен. Это бесплатно и очень просто – напиши @kinopoiskdev_bot, и меньше чем за минуту токен будет у тебя. Пришли его в ответ на это сообщение, и я продолжу!',
+        '🙋🏻 Часть фильмов уже обработана, но найти пока получилось не все. Нам придется использовать неофициальный API Кинопоиска, для работы с которым тебе надо получить личный токен. Это бесплатно и очень просто – напиши @poiskkinodev_bot, и меньше чем за минуту токен будет у тебя. Пришли его в ответ на это сообщение, и я продолжу!',
       );
       // Treat the token request as a temporary status message to keep the chat clean later
       session.tempStatusMessageId = (tokenRequestMsg as any).message_id;
