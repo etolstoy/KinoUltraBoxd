@@ -22,4 +22,57 @@ describe('htmlParsingService', () => {
     const seriesCount = entries.filter(e => e.type === 'series').length;
     expect(seriesCount).toBe(1);
   });
+});
+
+describe('htmlParsingService - MHTML support', () => {
+  let entries: FilmData[];
+
+  beforeAll(() => {
+    const mhtmlPath = path.resolve(__dirname, 'ideal.mhtml');
+    const mhtml = fs.readFileSync(mhtmlPath, 'utf8');
+    entries = parseKinopoiskIdsFromHtmlFiles([mhtml]);
+  });
+
+  it('should extract 2 entries from ideal.mhtml', () => {
+    expect(entries.length).toBe(2);
+  });
+
+  it('should correctly parse the film entry', () => {
+    const film = entries.find(e => e.kinopoiskId === 126196);
+    expect(film).toBeDefined();
+    expect(film!.type).toBe('film');
+    expect(film!.title).toBe('Das Leben der Anderen');
+    expect(film!.year).toBe(2006);
+    expect(film!.rating).toBe(8);
+    expect(film!.watchDate).toBe('2023-01-16');
+  });
+
+  it('should correctly parse the series entry', () => {
+    const series = entries.find(e => e.kinopoiskId === 404900);
+    expect(series).toBeDefined();
+    expect(series!.type).toBe('series');
+    expect(series!.title).toBe('Breaking Bad');
+    expect(series!.rating).toBe(10);
+    expect(series!.watchDate).toBe('2013-11-28');
+  });
+
+  it('should return empty array for a non-Kinopoisk MHTML file', () => {
+    const boundary = '----TestBoundary--';
+    const plainHtml = '<html><body><p>Not a Kinopoisk page</p></body></html>';
+    const fakeMhtml = [
+      'From: <Saved by Blink>',
+      'MIME-Version: 1.0',
+      `Content-Type: multipart/related; type="text/html"; boundary="${boundary}"`,
+      '',
+      `--${boundary}`,
+      'Content-Type: text/html',
+      'Content-Transfer-Encoding: quoted-printable',
+      '',
+      plainHtml,
+      `--${boundary}--`,
+    ].join('\n');
+
+    const result = parseKinopoiskIdsFromHtmlFiles([fakeMhtml]);
+    expect(result).toEqual([]);
+  });
 }); 

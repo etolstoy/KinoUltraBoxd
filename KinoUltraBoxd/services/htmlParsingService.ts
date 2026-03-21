@@ -3,6 +3,48 @@ import * as cheerio from 'cheerio';
 import { FilmData } from '../models/FilmData';
 
 /**
+ * Detects and decodes MHTML (MIME HTML) content into plain HTML.
+ * MHTML files use quoted-printable encoding and MIME multipart structure.
+ */
+function decodeMhtmlIfNeeded(content: string): string {
+  if (!content.includes('Content-Type: multipart/related')) {
+    return content;
+  }
+
+  const boundaryMatch = content.match(/boundary="([^"]+)"/);
+  if (!boundaryMatch) return content;
+
+  const boundary = boundaryMatch[1];
+  const parts = content.split('--' + boundary);
+
+  for (const part of parts) {
+    if (!part.includes('Content-Type: text/html')) continue;
+
+    const bodyStart = part.includes('\r\n\r\n')
+      ? part.indexOf('\r\n\r\n') + 4
+      : part.indexOf('\n\n') + 2;
+    const qpBody = part.slice(bodyStart);
+
+    // Decode quoted-printable: join soft line breaks, then decode =XX hex bytes as UTF-8
+    const joined = qpBody.replace(/=\r\n/g, '').replace(/=\n/g, '');
+    const bytes: number[] = [];
+    let i = 0;
+    while (i < joined.length) {
+      if (joined[i] === '=' && i + 2 < joined.length && /^[0-9A-Fa-f]{2}$/.test(joined.slice(i + 1, i + 3))) {
+        bytes.push(parseInt(joined.slice(i + 1, i + 3), 16));
+        i += 3;
+      } else {
+        bytes.push(joined.charCodeAt(i));
+        i++;
+      }
+    }
+    return Buffer.from(bytes).toString('utf8');
+  }
+
+  return content;
+}
+
+/**
  * Parses provided HTML files and extracts kinopoiskIds from valid Kinopoisk pages.
  * @param htmlFiles Array of HTML file contents as strings
  * @returns Array of FilmData objects containing kinopoiskId and type
@@ -10,7 +52,8 @@ import { FilmData } from '../models/FilmData';
 export function parseKinopoiskIdsFromHtmlFiles(htmlFiles: string[]): FilmData[] {
   const results: FilmData[] = [];
 
-  htmlFiles.forEach((html, idx) => {
+  htmlFiles.forEach((rawHtml, idx) => {
+    const html = decodeMhtmlIfNeeded(rawHtml);
     const $ = cheerio.load(html);
     const hasProfileFilmsList = $('.profileFilmsList').length > 0;
     const hasKinopoiskHeader = $('meta[property="og:site_name"]').attr('content')?.includes('Кинопоиск') || false;
