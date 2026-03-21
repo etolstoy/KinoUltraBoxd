@@ -1,0 +1,51 @@
+From: <Saved by Blink>
+Snapshot-Content-Location: https://www.kinopoisk.ru/user/123/votes/
+Subject: Test
+MIME-Version: 1.0
+Content-Type: multipart/related;
+	type="text/html";
+	boundary="----TestBoundary--synthetic--"
+
+
+------TestBoundary--synthetic--
+Content-Type: text/html
+Content-Transfer-Encoding: quoted-printable
+Content-Location: https://www.kinopoisk.ru/user/123/votes/
+
+<!DOCTYPE html>
+<html lang=3D"ru">
+<head>
+<meta http-equiv=3D"Content-Type" content=3D"text/html; charset=3DUTF-8">
+<meta property=3D"og:site_name" content=3D"=D0=9A=D0=B8=D0=BD=D0=BE=D0=BF=
+=D0=BE=D0=B8=D1=81=D0=BA" />
+<title>=D0=9F=D1=80=D0=BE=D1=84=D0=B8=D0=BB=D1=8C: =D0=A2=D0=B5=D1=81=D1=82=
+ - =D0=9E=D1=86=D0=B5=D0=BD=D0=BA=D0=B8</title>
+</head>
+<body>
+<div class=3D"profileFilmsList">
+<div class=3D"item">
+<div class=3D"info">
+<div class=3D"nameRus"><a href=3D"/film/126196/">=D0=96=D0=B8=D0=B7=D0=BD=
+=D1=8C =D0=B4=D1=80=D1=83=D0=B3=D0=B8=D1=85 (2006)</a></div>
+<div class=3D"nameEng">Das Leben der Anderen</div>
+</div>
+<div class=3D"date">16.01.2023, 01:00</div>
+<script nonce=3D"">
+ur_data.push({film: 126196, rating: '8', user_code: 'abc', obj: null});
+</script>
+</div>
+<div class=3D"item">
+<div class=3D"info">
+<div class=3D"nameRus"><a href=3D"/series/404900/">Breaking Bad</a></div>
+<div class=3D"nameEng">Breaking Bad</div>
+</div>
+<div class=3D"date">28.11.2013, 12:00</div>
+<script nonce=3D"">
+ur_data.push({film: 404900, rating: '10', user_code: 'def', obj: null});
+</script>
+</div>
+</div>
+</body>
+</html>
+
+------TestBoundary--synthetic----
