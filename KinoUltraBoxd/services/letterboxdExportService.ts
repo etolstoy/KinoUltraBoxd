@@ -45,6 +45,9 @@ export function generateLetterboxdCsv(films: FilmData[]): Buffer {
       lines.push(cols.join(','));
     });
 
-  const csvString = lines.join('\n');
+  // Reverse rows (except header), to import movies in the correct order.
+  const linesReversed = [lines[0], ...lines.slice(1).reverse()];
+
+  const csvString = linesReversed.join('\n');
   return Buffer.from(csvString, 'utf-8');
 } 
