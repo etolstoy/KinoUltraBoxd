@@ -75,4 +75,31 @@ describe('htmlParsingService - MHTML support', () => {
     const result = parseKinopoiskIdsFromHtmlFiles([fakeMhtml]);
     expect(result).toEqual([]);
   });
-}); 
+});
+
+describe('htmlParsingService - Watchlist ("Буду смотреть") support', () => {
+  it('should extract 200 films from Watchlist page 1', () => {
+    const watchlistPath = path.resolve(__dirname, '../../test/watchlist not ready/Профиль_ Евгений С. - Фильмы.html');
+    if (fs.existsSync(watchlistPath)) {
+      const html = fs.readFileSync(watchlistPath, 'utf8');
+      const entries = parseKinopoiskIdsFromHtmlFiles([html]);
+      expect(entries.length).toBe(200);
+      expect(entries[0].kinopoiskId).toBe(4854589);
+      expect(entries[0].year).toBe(2023);
+      expect(entries[0].rating).toBeNull();
+      expect(entries[0].watchDate).toBeNull();
+    }
+  });
+
+  it('should extract 48 films from Watchlist page 2', () => {
+    const watchlistPath = path.resolve(__dirname, '../../test/watchlist not ready/Профиль_ Евгений С. - Фильмы 2.html');
+    if (fs.existsSync(watchlistPath)) {
+      const html = fs.readFileSync(watchlistPath, 'utf8');
+      const entries = parseKinopoiskIdsFromHtmlFiles([html]);
+      expect(entries.length).toBe(48);
+      expect(entries[0].kinopoiskId).toBe(515);
+      expect(entries[0].year).toBe(1995);
+    }
+  });
+});
+ 

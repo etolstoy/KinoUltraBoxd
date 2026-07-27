@@ -56,13 +56,21 @@ export function parseKinopoiskIdsFromHtmlFiles(htmlFiles: string[]): FilmData[] 
     const html = decodeMhtmlIfNeeded(rawHtml);
     const $ = cheerio.load(html);
     const hasProfileFilmsList = $('.profileFilmsList').length > 0;
+    const hasItemList = $('#itemList').length > 0;
     const hasKinopoiskHeader = $('meta[property="og:site_name"]').attr('content')?.includes('Кинопоиск') || false;
-    const items = $('.profileFilmsList .item');
+
+    let items = $('.profileFilmsList .item');
+    if (items.length === 0) {
+      items = $('#itemList li.item');
+    }
+    if (items.length === 0 && (hasProfileFilmsList || hasItemList)) {
+      items = $('.item');
+    }
     const hasItems = items.length > 0;
 
-    console.log(`[htmlParsingService] File #${idx + 1}: hasProfileFilmsList=${hasProfileFilmsList}, hasKinopoiskHeader=${hasKinopoiskHeader}, hasItems=${hasItems}`);
+    console.log(`[htmlParsingService] File #${idx + 1}: hasProfileFilmsList=${hasProfileFilmsList}, hasItemList=${hasItemList}, hasKinopoiskHeader=${hasKinopoiskHeader}, itemsCount=${items.length}`);
 
-    if (!(hasProfileFilmsList && hasKinopoiskHeader && hasItems)) {
+    if (!((hasProfileFilmsList || hasItemList || hasItems) && hasKinopoiskHeader && hasItems)) {
       console.warn(`[htmlParsingService] File #${idx + 1} is not a valid Kinopoisk ratings/watched films page. Skipping.`);
       return;
     }
@@ -85,7 +93,16 @@ export function parseKinopoiskIdsFromHtmlFiles(htmlFiles: string[]): FilmData[] 
         if (midAttr) idStr = midAttr;
       }
 
-      // 3) Determine type & fallback id extraction using the href of first matching link
+      // 3) Watchlist markup may use id attribute on the element (e.g., id="film_4854589")
+      if (!idStr) {
+        const elementId = $(el).attr('id');
+        if (elementId) {
+          const match = elementId.match(/(?:film|series)_(\d+)/);
+          if (match) idStr = match[1];
+        }
+      }
+
+      // 4) Determine type & fallback id extraction using the href of first matching link
       const href = $(el).find('a[href*="/film/"], a[href*="/series/"]').first().attr('href');
       if (href) {
         if (href.includes('/series/')) entryType = 'series';
@@ -98,18 +115,29 @@ export function parseKinopoiskIdsFromHtmlFiles(htmlFiles: string[]): FilmData[] 
         }
       }
 
-      // Extract title (prefer English, fallback to Russian)
+      // Extract title (prefer English, fallback to Russian or general link name)
       const engTitle = $(el).find('.nameEng').text().trim();
       if (engTitle) {
         title = engTitle;
       } else {
         const nameRusEl = $(el).find('.nameRus');
-        title = nameRusEl.clone().children().remove().end().text().trim();
+        if (nameRusEl.length > 0) {
+          title = nameRusEl.clone().children().remove().end().text().trim();
+        } else {
+          const nameLinkEl = $(el).find('a.name, .name a, .name').first();
+          if (nameLinkEl.length > 0) {
+            title = nameLinkEl.text().trim();
+          }
+        }
       }
 
-      // Extract year from Russian name line (last parentheses content)
+      // Extract year from Russian name line or full item text
       const nameRusText = $(el).find('.nameRus').text();
-      const yearMatch = nameRusText.match(/\((\d{4})\)[^()]*$/);
+      let yearMatch = nameRusText.match(/\((\d{4})\)[^()]*$/);
+      if (!yearMatch) {
+        const fullItemText = $(el).text();
+        yearMatch = fullItemText.match(/\((\d{4})\)/);
+      }
       if (yearMatch) {
         year = Number(yearMatch[1]);
       }
