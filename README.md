@@ -154,4 +154,4 @@ curl -X POST "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/setWebhook" \
 7. Download the generated `letterboxd.csv` file
 8. Import the CSV to Letterboxd
 
-The bot supports both rated and watched (but unrated) movies, handles pagination across multiple HTML files, and provides detailed statistics about the conversion process.
+The bot supports rated movies, watched (but unrated) movies, and Watchlist, handles pagination across multiple HTML files, and provides detailed statistics about the conversion process.
