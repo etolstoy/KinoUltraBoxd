@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import bot from '../KinoUltraBoxd/bot';
+import { waitUntil } from '@vercel/functions';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
@@ -13,10 +14,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const update = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
-    await bot.handleUpdate(update as any);
+    if (!update || !Number.isSafeInteger(update.update_id)) return res.status(400).send('Invalid update');
+    // Telegram gets an immediate acknowledgement; Vercel keeps the import alive.
+    waitUntil(bot.handleUpdate(update as any).catch(() => {
+      console.error('[webhook] background update failed');
+    }));
     res.status(200).send('OK');
   } catch (err) {
-    console.error('[webhook] failed to handle update', err);
-    res.status(500).end();
+    console.error('[webhook] invalid update');
+    res.status(400).end();
   }
-} 
+}

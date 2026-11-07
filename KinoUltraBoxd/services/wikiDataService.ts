@@ -10,7 +10,7 @@ const USER_AGENT = 'KinoUltraBoxdBot/1.0 (+https://github.com/etolstoy/KinoUltra
 const MAX_IDS_PER_QUERY = 500;
 const REQUEST_TIMEOUT = 30_000; // 30 seconds
 
-async function fetchTmdbMappings(kinopoiskIds: number[]): Promise<Map<number, number>> {
+async function fetchTmdbMappings(kinopoiskIds: number[], deadline: number): Promise<Map<number, number>> {
   const result = new Map<number, number>();
   if (kinopoiskIds.length === 0) return result;
 
@@ -20,6 +20,7 @@ async function fetchTmdbMappings(kinopoiskIds: number[]): Promise<Map<number, nu
   }
 
   for (const chunk of chunks) {
+    if (Date.now() >= deadline) break;
     try {
       const sparqlQuery = buildSparqlQuery(chunk);
       const response = await axios.post(
@@ -31,7 +32,7 @@ async function fetchTmdbMappings(kinopoiskIds: number[]): Promise<Map<number, nu
             'Content-Type': 'application/x-www-form-urlencoded',
             'Accept': 'application/json'
           },
-          timeout: REQUEST_TIMEOUT,
+          timeout: Math.max(1, Math.min(REQUEST_TIMEOUT, deadline - Date.now())),
         },
       );
 
@@ -44,7 +45,7 @@ async function fetchTmdbMappings(kinopoiskIds: number[]): Promise<Map<number, nu
         }
       }
     } catch (err) {
-      console.error('[wikiDataService] Failed querying WikiData:', err);
+      console.warn('[wikiDataService] Failed querying WikiData');
     }
   }
 
@@ -62,11 +63,11 @@ function buildSparqlQuery(ids: number[]): string {
   `.trim();
 }
 
-export async function attachTmdbIds(films: FilmData[]): Promise<FilmData[]> {
+export async function attachTmdbIds(films: FilmData[], deadline = Date.now() + 30_000): Promise<FilmData[]> {
   const toLookup = films.filter((f) => f.tmdbId == null).map((f) => f.kinopoiskId);
   const uniqueIds = Array.from(new Set(toLookup));
 
-  const mappings = await fetchTmdbMappings(uniqueIds);
+  const mappings = await fetchTmdbMappings(uniqueIds, deadline);
 
   return films.map((film) => {
     if (film.tmdbId != null) return FilmData.clone(film);
@@ -77,4 +78,4 @@ export async function attachTmdbIds(films: FilmData[]): Promise<FilmData[]> {
     }
     return FilmData.clone(film);
   });
-} 
+}

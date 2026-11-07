@@ -1,17 +1,15 @@
 {
   "version": 2,
-  "builds": [
+  "routes": [
     {
-      "src": "api/**/*.ts",
-      "use": "@vercel/node",
-      "config": {
-        "includeFiles": [
-          "KinoUltraBoxd/**"
-        ]
-      }
+      "src": "/api/webhook",
+      "dest": "api/webhook.ts"
     }
   ],
-  "routes": [
-    { "src": "/api/webhook", "dest": "api/webhook.ts" }
-  ]
-} 
+  "functions": {
+    "api/webhook.ts": {
+      "includeFiles": "KinoUltraBoxd/**",
+      "maxDuration": 300
+    }
+  }
+}

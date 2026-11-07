@@ -21,11 +21,11 @@ interface ExportStats {
 
 function computeStats(films: FilmData[]): ExportStats {
   const totalEntries = films.length;
-  const hasAnyId = (f: FilmData) => f.imdbId != null || f.tmdbId != null;
+  const hasAnyId = (f: FilmData) => f.type === 'film' && (f.imdbId != null || f.tmdbId != null);
   const withoutAnyId = (f: FilmData) => f.imdbId == null && f.tmdbId == null;
 
   const exportableCount = films.filter(hasAnyId).length;
-  const skippedCount = films.filter(withoutAnyId).length;
+  const skippedCount = films.length - exportableCount;
   const seriesCount = films.filter((f) => f.type === 'series').length;
   const unmatchedFilmCount = films.filter((f) => f.type === 'film' && withoutAnyId(f)).length;
   const rated = films.filter((f) => hasAnyId(f) && f.rating != null && f.rating > 0);
@@ -49,7 +49,9 @@ function computeStats(films: FilmData[]): ExportStats {
 function buildStatsMessage(stats: ExportStats): string {
   const lines: string[] = [];
 
-  lines.push('✅ Побег из Кинопоиска завершился успешно! Скачай файл с оценками и импортируй из на Letterboxd вот по [этой инструкции](https://letterboxd.com/import/).');
+  lines.push(stats.exportableCount > 0
+    ? '✅ Экспорт готов! Скачай CSV и импортируй его на [Letterboxd](https://letterboxd.com/import/). При импорте отметь фильмы как просмотренные.'
+    : '✅ Профиль загружен. Надёжных совпадений для CSV не найдено; все записи сохранены в резервной копии.');
   lines.push('');
   lines.push(`• Всего записей в загруженном профиле Кинопоиска: ${stats.totalEntries}`);
   lines.push(`• Из них на Letterboxd попадут: ${stats.exportableCount}`);
@@ -63,7 +65,7 @@ function buildStatsMessage(stats: ExportStats): string {
 
     if (stats.seriesCount !== 0) {
       lines.push(`• Сериалы: ${stats.seriesCount}`);
-      lines.push('Letterboxd не поддерживает сериалы. Можешь попробовать переехать с ними на сервис MyShows.');
+      lines.push('Сериалы пропущены в этом CSV и сохранены отдельно в списке записей.');
     }
 
     if (stats.unmatchedFilmCount !== 0) {
@@ -117,4 +119,4 @@ export function buildStatsReport(
   }
 
   return { message, notFoundFilms, stats };
-} 
+}

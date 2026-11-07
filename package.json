@@ -1,9 +1,8 @@
 {
   "dependencies": {
-    "@types/cheerio": "^0.22.35",
+    "@vercel/functions": "^3.11.0",
     "axios": "^1.6.1",
     "better-sqlite3": "^9.2.3",
-    "cheerio": "^1.1.0",
     "dotenv": "^17.2.0",
     "ioredis": "^5.3.2",
     "telegraf": "^4.16.3",
@@ -20,13 +19,17 @@
     "typescript": "^5.8.3"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "rimraf dist && tsc",
     "typecheck": "tsc --noEmit",
     "prestart": "npm run build",
     "start": "node dist/KinoUltraBoxd/bot.js",
     "predev": "rimraf dist",
     "dev": "ts-node KinoUltraBoxd/bot.ts",
-    "test": "jest"
+    "test": "jest",
+    "verify:profiles": "ts-node KinoUltraBoxd/scripts/verifyProfileImport.ts"
   },
-  "main": "dist/KinoUltraBoxd/bot.js"
+  "main": "dist/KinoUltraBoxd/bot.js",
+  "engines": {
+    "node": "22.x"
+  }
 }

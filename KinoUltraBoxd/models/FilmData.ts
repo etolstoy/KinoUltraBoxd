@@ -1,4 +1,4 @@
-// Define shape for potential TMDB matches that can help with manual disambiguation
+// Candidate metadata retained in backups when identifier resolution is uncertain.
 export class PotentialMatch {
   constructor(
     public title: string,
@@ -35,8 +35,11 @@ export class FilmData {
     public type: 'film' | 'series',
     public kinopoiskId: number,
     public tmdbId: number | null = null,
-    public imdbId: number | null = null,
+    public imdbId: string | null = null,
     public potentialMatches?: PotentialMatch[],
+    /** Rating and watched-marker times are not evidence of a diary viewing date. */
+    public ratedAt: string | null = null,
+    public watchedMarkedAt: string | null = null,
   ) {}
 
   /** Direct link to the film/series page on Kinopoisk */
@@ -69,6 +72,8 @@ export class FilmData {
       overrides.tmdbId ?? base.tmdbId,
       overrides.imdbId ?? base.imdbId,
       overrides.potentialMatches ?? base.potentialMatches,
+      overrides.ratedAt ?? base.ratedAt,
+      overrides.watchedMarkedAt ?? base.watchedMarkedAt,
     );
   }
-} 
+}

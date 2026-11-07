@@ -1,5 +1,6 @@
 import { createSessionStore } from '../sessionStore';
 import { BotSessionState } from '../models/SessionModels';
+import { randomUUID } from 'crypto';
 
 /**
  * Thin wrapper around the key-value store that provides strongly-typed helpers
@@ -11,11 +12,10 @@ export class SessionManager {
   /** Retrieve session or return a blank default object. */
   async get(userId: number): Promise<BotSessionState> {
     const existing = await this.store.get(userId.toString());
-    return (
-      existing ?? {
-        fileQueue: { file_ids: [], file_names: [] },
-      }
-    );
+    // Read only current fields; discard obsolete queues and credentials in stored sessions.
+    return Number.isSafeInteger(existing?.lastProfileUpdateId)
+      ? { lastProfileUpdateId: existing!.lastProfileUpdateId }
+      : {};
   }
 
   /** Persist full session object (overwrites previous value). */
@@ -23,13 +23,15 @@ export class SessionManager {
     await this.store.set(userId.toString(), state);
   }
 
-  /** Convenience: clear selection workflow (if exists). */
-  async clearSelection(userId: number): Promise<void> {
-    const state = await this.get(userId);
-    delete state.selection;
-    await this.set(userId, state);
+  async acquireImport(userId: number): Promise<string | null> {
+    const token = randomUUID();
+    return await this.store.acquire(`profile-import:${userId}`, token, 360) ? token : null;
+  }
+
+  async releaseImport(userId: number, token: string): Promise<void> {
+    await this.store.release(`profile-import:${userId}`, token);
   }
 }
 
 // Shared singleton instance
-export const sessionManager = new SessionManager(); 
+export const sessionManager = new SessionManager();

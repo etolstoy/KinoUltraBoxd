@@ -1,10 +1,9 @@
-// filmProcessingService.ts (moved to services folder)
-import { parseKinopoiskIdsFromHtmlFiles } from './htmlParsingService';
 import { FilmData } from '../models/FilmData';
 import { attachImdbIds } from './localImdbService';
 import { attachTmdbIds } from './wikiDataService';
 import { attachTmdbIdsViaSearch } from './tmdbSearchService';
 import { attachTmdbIdsViaKinopoisk } from './kinopoiskDevService';
+import { env } from 'process';
 
 // Helper type representing any enrichment function (sync or async)
 type EnrichFn = (films: FilmData[]) => Promise<FilmData[]> | FilmData[];
@@ -42,19 +41,9 @@ async function enrichStage(
   enriched.forEach((f) => filmMap.set(f.kinopoiskId, f));
 }
 
-/**
- * Converts Kinopoisk HTML pages to fully-enriched FilmData objects.
- *
- * Each enrichment phase (IMDb first, TMDB second) receives **only** those
- * films that still lack both identifiers. This minimises external look-ups
- * and keeps every stage focused on what it can actually enrich.
- *
- * The function does not mutate its input – it works with shallow copies and
- * returns a brand-new array.
- */
-export async function process(htmlFiles: string[], kinopoiskToken?: string): Promise<FilmData[]> {
-  // ---------- 1. Parse Kinopoisk pages ----------
-  const parsedFilms = parseKinopoiskIdsFromHtmlFiles(htmlFiles);
+/** Resolve identifiers for profile records without requiring user credentials. */
+export async function enrichFilms(parsedFilms: FilmData[], metadataToken = env.KINOPOISK_API_KEY,
+  deadline = Date.now() + 120_000): Promise<FilmData[]> {
 
   // Use a map keyed by kinopoiskId, so we can merge enriched results back in.
   const filmMap = new Map<number, FilmData>(
@@ -62,17 +51,19 @@ export async function process(htmlFiles: string[], kinopoiskToken?: string): Pro
   );
 
   // ---------- 2. IMDb enrichment ----------
-   await enrichStage('IMDb enrichment', filmMap, (films) => attachImdbIds(films));
+  await enrichStage('IMDb enrichment', filmMap, (films) => attachImdbIds(films));
 
   // ---------- 3. TMDB enrichment (WikiData) ----------
-  await enrichStage('TMDB enrichment (WikiData)', filmMap, attachTmdbIds);
+  await enrichStage('TMDB enrichment (WikiData)', filmMap, films => attachTmdbIds(films, deadline));
 
   // ---------- 4. TMDB enrichment (Kinopoisk.dev) ----------
-  await enrichStage('TMDB enrichment (Kinopoisk.dev)', filmMap, (films) => attachTmdbIdsViaKinopoisk(films, kinopoiskToken));
+  if (metadataToken) {
+    await enrichStage('TMDB enrichment (Kinopoisk.dev)', filmMap, (films) => attachTmdbIdsViaKinopoisk(films, metadataToken, deadline));
+  }
 
   // ---------- 5. TMDB enrichment (TMDB Search) ----------
-  await enrichStage('TMDB enrichment (TMDB Search)', filmMap, attachTmdbIdsViaSearch);
+  await enrichStage('TMDB enrichment (TMDB Search)', filmMap, films => attachTmdbIdsViaSearch(films, deadline));
 
   const finalFilms = [...filmMap.values()];
   return finalFilms;
-} 
+}
