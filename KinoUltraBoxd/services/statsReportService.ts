@@ -1,4 +1,5 @@
 import { FilmData } from '../models/FilmData';
+import type { ProfileList } from './kinopoiskProfileService';
 
 interface ExportStats {
   /** Всего записей в загруженном профиле Кинопоиска */
@@ -46,18 +47,23 @@ function computeStats(films: FilmData[]): ExportStats {
   };
 }
 
-function buildStatsMessage(stats: ExportStats): string {
+function buildStatsMessage(stats: ExportStats, list: ProfileList): string {
   const lines: string[] = [];
 
-  lines.push(stats.exportableCount > 0
-    ? '✅ Экспорт готов! Скачай CSV и импортируй его на [Letterboxd](https://letterboxd.com/import/). При импорте отметь фильмы как просмотренные.'
-    : '✅ Профиль загружен. Надёжных совпадений для CSV не найдено; все записи сохранены в резервной копии.');
+  lines.push(list === 'history' ? 'Оценки и просмотры' : '«Буду смотреть»');
+  if (stats.totalEntries === 0) {
+    lines.push('Список пуст — CSV для него не нужен.');
+    return lines.join('\n');
+  }
+  if (stats.exportableCount === 0) lines.push('Надёжных совпадений для CSV не найдено; все записи сохранены в резервной копии.');
   lines.push('');
-  lines.push(`• Всего записей в загруженном профиле Кинопоиска: ${stats.totalEntries}`);
+  lines.push(`• Загружено записей: ${stats.totalEntries}`);
   lines.push(`• Из них на Letterboxd попадут: ${stats.exportableCount}`);
-  lines.push(`• С оценками: ${stats.ratedCount}`);
-  lines.push(`• Без оценок: ${stats.unratedCount}`);
-  lines.push(`• Средняя оценка: ${stats.averageRating.toFixed(2)}`);
+  if (list === 'history') {
+    lines.push(`• С оценками: ${stats.ratedCount}`);
+    lines.push(`• Без оценок: ${stats.unratedCount}`);
+    lines.push(`• Средняя оценка: ${stats.averageRating.toFixed(2)}`);
+  }
 
   if (stats.skippedCount > 0) {
     lines.push('');
@@ -83,9 +89,10 @@ function buildStatsMessage(stats: ExportStats): string {
  */
 export function buildStatsReport(
   films: FilmData[],
+  list: ProfileList = 'history',
 ): { message: string; notFoundFilms?: string[]; stats: ExportStats } {
   const stats = computeStats(films);
-  const message = buildStatsMessage(stats);
+  const message = buildStatsMessage(stats, list);
 
   let notFoundFilms: string[] | undefined;
   if (stats.unmatchedFilmCount > 0 || stats.seriesCount > 0) {

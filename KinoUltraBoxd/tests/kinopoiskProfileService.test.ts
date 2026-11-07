@@ -37,6 +37,42 @@ describe('profile input', () => {
 });
 
 describe('anonymous structured import', () => {
+  const planned = (id: number) => ({ ...item(id), reactions: [{ __typename: 'PlannedToWatch', plannedToWatch: true }] });
+  it('fetches all watchlist pages using the website document and preserves order without watched status', async () => {
+    const { client, request } = setup();
+    request.mockResolvedValueOnce(page(Array.from({ length: 20 }, (_, i) => planned(i + 1)), 21))
+      .mockResolvedValueOnce(page([planned(21)], 21, 20));
+    const result = await client.importWatchlist('https://kinopoisk.ru/user/1/movies/planned-to-watch/');
+    expect(result).toMatchObject({ total: 21, pages: 2, source: 'website', warnings: [] });
+    expect(result.films.map(f => f.kinopoiskId)).toEqual(Array.from({ length: 21 }, (_, i) => i + 1));
+    expect(result.films.every(f => f.rating === null && f.watchDate === null && f.watchedMarkedAt === null && f.ratedAt === null)).toBe(true);
+    expect(request.mock.calls.map(([b]) => b.variables.offset)).toEqual([0, 20]);
+    for (const [body] of request.mock.calls) {
+      expect(body.operationName).toBe('UserReactionMoviesPage');
+      expect(body.variables).toMatchObject({ includeTypes: ['PLANNED_TO_WATCH'], isAuthorized: false, socialAlias: '1' });
+    }
+  });
+  it('accepts an empty watchlist independently of history', async () => {
+    const { client, request } = setup(); request.mockResolvedValue(page([]));
+    expect(await client.importWatchlist('1')).toMatchObject({ total: 0, films: [], source: 'website' });
+  });
+  it.each([
+    ['unwatched flag', { ...planned(1), reactions: [{ __typename: 'PlannedToWatch', plannedToWatch: false }] }, 'watchlist'],
+    ['watched record in watchlist', item(1), 'watchlist'],
+    ['watchlist record in history', planned(1), 'history'],
+  ])('rejects %s instead of conflating memberships', async (_, record, kind) => {
+    const { client, request } = setup(); request.mockResolvedValue(page([record]));
+    await expect(kind === 'watchlist' ? client.importWatchlist('1') : client.importProfile('1')).rejects.toMatchObject({ code: 'SCHEMA_CHANGED' });
+  });
+  it.each([
+    ['partial page', page([planned(1)], 25), 'INCOMPLETE_IMPORT'],
+    ['duplicate entries', page([planned(1), planned(1)]), 'INCOMPLETE_IMPORT'],
+    ['unavailable', error('User authentication failed: anonymous user'), 'PROFILE_UNAVAILABLE'],
+    ['data with errors', { status: 200, data: { ...page([planned(1)]).data, errors: [{ message: 'subgraph failure' }] } }, 'SCHEMA_CHANGED'],
+  ])('rejects a watchlist with %s without returning partial records', async (_, response, code) => {
+    const { client, request } = setup(); request.mockResolvedValue(response);
+    await expect(client.importWatchlist('1')).rejects.toMatchObject({ code });
+  });
   it('reads a real Android response and keeps event timestamps out of diary dates', async () => {
     const { client, request } = setup();
     request.mockResolvedValue({ status: 200, data: JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures/profile-response.json'), 'utf8')) });

@@ -1,4 +1,5 @@
 import { FilmData } from '../models/FilmData';
+import type { ProfileList } from './kinopoiskProfileService';
 
 /**
  * Generates a CSV (RFC-4180 compliant) buffer that can be imported to Letterboxd.
@@ -6,14 +7,15 @@ import { FilmData } from '../models/FilmData';
  * Rules:
  *   • Only films that have either tmdbId **or** imdbId are exported (others are skipped).
  *   • Output columns must match Letterboxd spec exactly and be in the following order:
- *       Title,Year,Rating,WatchedDate,tmdbID,imdbID
+ *       Title,Year,Rating10,WatchedDate,tmdbID,imdbID (history)
+ *       Title,Year,tmdbID,imdbID (watchlist)
  *   • Empty values are encoded as an empty string (two consecutive commas)
  *   • Ratings are included only when `rating > 0`.
  *
  * The function does **not** write to disk.  The caller can use the returned Buffer to
  * send the file through Telegram or save it as needed.
  */
-export function generateLetterboxdCsv(films: FilmData[]): Buffer {
+export function generateLetterboxdCsv(films: FilmData[], list: ProfileList = 'history'): Buffer {
   // Helper: escape field for CSV, wrap in quotes if it contains dangerous chars
   const escape = (value: string): string => {
     if (value.includes('"')) {
@@ -28,7 +30,7 @@ export function generateLetterboxdCsv(films: FilmData[]): Buffer {
   };
 
   // CSV header row (Letterboxd is case-sensitive for column names)
-  const lines: string[] = ['Title,Year,Rating10,WatchedDate,tmdbID,imdbID'];
+  const lines: string[] = [list === 'watchlist' ? 'Title,Year,tmdbID,imdbID' : 'Title,Year,Rating10,WatchedDate,tmdbID,imdbID'];
 
   films
     .filter((f) => f.type === 'film' && (f.tmdbId != null || f.imdbId != null))
@@ -37,8 +39,10 @@ export function generateLetterboxdCsv(films: FilmData[]): Buffer {
 
       cols.push(escape(movie.title));
       cols.push(movie.year != null ? String(movie.year) : '');
-      cols.push(movie.rating != null && movie.rating > 0 ? String(movie.rating) : '');
-      cols.push(movie.watchDate ?? '');
+      if (list === 'history') {
+        cols.push(movie.rating != null && movie.rating > 0 ? String(movie.rating) : '');
+        cols.push(movie.watchDate ?? '');
+      }
       cols.push(movie.tmdbId != null ? String(movie.tmdbId) : '');
       cols.push(movie.imdbId != null ? String(movie.imdbId) : '');
 
