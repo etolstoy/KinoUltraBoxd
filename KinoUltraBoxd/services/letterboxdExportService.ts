@@ -21,7 +21,7 @@ export function generateLetterboxdCsv(films: FilmData[]): Buffer {
       value = value.replace(/"/g, '""');
     }
     // If value contains comma, quote or newline – wrap in quotes
-    if (/[",\n]/.test(value)) {
+    if (/[",\r\n]/.test(value)) {
       return `"${value}"`;
     }
     return value;
@@ -31,7 +31,7 @@ export function generateLetterboxdCsv(films: FilmData[]): Buffer {
   const lines: string[] = ['Title,Year,Rating10,WatchedDate,tmdbID,imdbID'];
 
   films
-    .filter((f) => f.tmdbId != null || f.imdbId != null)
+    .filter((f) => f.type === 'film' && (f.tmdbId != null || f.imdbId != null))
     .forEach((movie) => {
       const cols: string[] = [];
 
@@ -50,4 +50,4 @@ export function generateLetterboxdCsv(films: FilmData[]): Buffer {
 
   const csvString = linesReversed.join('\n');
   return Buffer.from(csvString, 'utf-8');
-} 
+}

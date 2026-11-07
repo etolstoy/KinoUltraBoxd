@@ -5,11 +5,14 @@ export interface KeyValueStore<V = any> {
   get(key: string): Promise<V | undefined>;
   set(key: string, value: V): Promise<void>;
   delete(key: string): Promise<void>;
+  acquire(key: string, token: string, ttlSeconds: number): Promise<boolean>;
+  release(key: string, token: string): Promise<void>;
 }
 
 // --------------------- In-memory store (dev / long-polling) ---------------------
 export class MemoryStore<V = any> implements KeyValueStore<V> {
   private readonly data = new Map<string, V>();
+  private readonly locks = new Map<string, { token: string; until: number }>();
 
   async get(key: string): Promise<V | undefined> {
     return this.data.get(key);
@@ -21,6 +24,16 @@ export class MemoryStore<V = any> implements KeyValueStore<V> {
 
   async delete(key: string): Promise<void> {
     this.data.delete(key);
+  }
+
+  async acquire(key: string, token: string, ttlSeconds: number): Promise<boolean> {
+    if ((this.locks.get(key)?.until ?? 0) > Date.now()) return false;
+    this.locks.set(key, { token, until: Date.now() + ttlSeconds * 1000 });
+    return true;
+  }
+
+  async release(key: string, token: string): Promise<void> {
+    if (this.locks.get(key)?.token === token) this.locks.delete(key);
   }
 }
 
@@ -64,13 +77,23 @@ export class RedisStore<V = any> implements KeyValueStore<V> {
     await this.ensureConnected();
     await this.redis.del(key);
   }
+
+  async acquire(key: string, token: string, ttlSeconds: number): Promise<boolean> {
+    await this.ensureConnected();
+    return await this.redis.set(key, token, 'EX', ttlSeconds, 'NX') === 'OK';
+  }
+
+  async release(key: string, token: string): Promise<void> {
+    await this.ensureConnected();
+    await this.redis.eval("if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end", 1, key, token);
+  }
 }
 
 // --------------------- Factory ---------------------
 export function createSessionStore<V = any>(): KeyValueStore<V> {
-  const redisUrl = process.env.REDIS_URL || process.env.UPSTASH_REDIS_REST_URL;
+  const redisUrl = process.env.REDIS_URL;
   if (redisUrl) {
     return new RedisStore<V>(redisUrl);
   }
   return new MemoryStore<V>();
-} 
+}

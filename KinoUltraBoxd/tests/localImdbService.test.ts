@@ -1,28 +1,22 @@
-import fs from 'fs';
-import path from 'path';
-
-import { parseKinopoiskIdsFromHtmlFiles } from '../services/htmlParsingService';
+import { FilmData } from '../models/FilmData';
 import { attachImdbIds } from '../services/localImdbService';
 
-describe('localImdbService.attachImdbIds (real DB, parsed from ideal.html)', () => {
-  const htmlPath = path.resolve(__dirname, 'ideal.html');
-  const html = fs.readFileSync(htmlPath, 'utf8');
+describe('localImdbService.attachImdbIds (real database)', () => {
+  const ids = [126196, 681849, 8222, 4511218, 4472502, 1354524, 421324, 7777777777, 404900];
+  const films = ids.map(id => new FilmData(`Film ${id}`, null, null, null, id === 404900 ? 'series' : 'film', id));
+  const processed = attachImdbIds(films);
 
-  const parsedFilms = parseKinopoiskIdsFromHtmlFiles([html]);
-  const processed = attachImdbIds(parsedFilms);
-
-  it('should parse exactly 9 entries from ideal.html', () => {
-    expect(parsedFilms.length).toBe(9);
+  it('preserves every input record without mutating the original objects', () => {
+    expect(processed).toHaveLength(films.length);
+    expect(films.every(f => f.imdbId === null)).toBe(true);
   });
 
-  it('should attach imdbId to 5 out of 9 films', () => {
-    const withImdb = processed.filter((f) => f.imdbId !== null);
-    expect(withImdb.length).toBe(5);
+  it('resolves five known identifiers, including the exact expected IMDb title', () => {
+    expect(processed.filter(f => f.imdbId !== null)).toHaveLength(5);
+    expect(processed.find(f => f.kinopoiskId === 126196)?.imdbId).toBe('tt0405094');
   });
 
-  it('should not attach imdbId to film with kinopoiskId 7777777777', () => {
-    const film = processed.find((f) => f.kinopoiskId === 7777777777);
-    expect(film).toBeDefined();
-    expect(film!.imdbId).toBeNull();
+  it('keeps an unknown Kinopoisk ID unresolved', () => {
+    expect(processed.find(f => f.kinopoiskId === 7777777777)?.imdbId).toBeNull();
   });
-}); 
+});

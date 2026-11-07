@@ -27,7 +27,7 @@ interface SearchResponse {
   results: TmdbMovie[];
 }
 
-async function searchOnce(title: string, year: number | null): Promise<TmdbMovie[]> {
+async function searchOnce(title: string, year: number | null, deadline: number): Promise<TmdbMovie[]> {
   const token = getTmdbToken();
   if (!token) return [];
 
@@ -43,12 +43,12 @@ async function searchOnce(title: string, year: number | null): Promise<TmdbMovie
         query: title,
         ...(year != null ? { year } : {}),
       },
-      timeout: 15_000,
+      timeout: Math.max(1, Math.min(15_000, deadline - Date.now())),
     });
 
     return Array.isArray(data.results) ? data.results : [];
   } catch (err) {
-    console.warn('[tmdbSearchService] TMDB request failed:', err);
+    console.warn('[tmdbSearchService] TMDB request failed');
     return [];
   }
 }
@@ -56,7 +56,7 @@ async function searchOnce(title: string, year: number | null): Promise<TmdbMovie
 /**
  * Collects up to 9 unique potential matches across ±1 year window.
  */
-async function collectPotentialMatches(title: string, year: number | null): Promise<PotentialMatch[]> {
+async function collectPotentialMatches(title: string, year: number | null, deadline: number): Promise<PotentialMatch[]> {
   const yearsToTry: (number | null)[] = [];
   if (year != null) {
     yearsToTry.push(year, year + 1, year - 1);
@@ -67,7 +67,8 @@ async function collectPotentialMatches(title: string, year: number | null): Prom
   const results: TmdbMovie[] = [];
 
   for (const y of yearsToTry) {
-    const batch = await searchOnce(title, y);
+    if (Date.now() >= deadline) break;
+    const batch = await searchOnce(title, y, deadline);
     results.push(...batch);
   }
 
@@ -96,17 +97,30 @@ async function collectPotentialMatches(title: string, year: number | null): Prom
  * Enriches FilmData objects with TMDB identifiers resolved via the search API.
  * Returns brand-new objects – never mutates the input array.
  */
-export async function attachTmdbIdsViaSearch(films: FilmData[]): Promise<FilmData[]> {
+export async function attachTmdbIdsViaSearch(films: FilmData[], deadline = Date.now() + 60_000): Promise<FilmData[]> {
   const token = getTmdbToken();
   if (!token) {
     console.warn('[tmdbSearchService] TMDB_API_KEY not provided – skipping search enrichment');
     return films.map(f => FilmData.clone(f));
   }
 
-  const enrichedPromises = films.map(async (film) => {
-    const matches = await collectPotentialMatches(film.title, film.year);
-    return FilmData.clone(film, { potentialMatches: matches });
-  });
-
-  return Promise.all(enrichedPromises);
-} 
+  const enriched: FilmData[] = new Array(films.length);
+  let cursor = 0;
+  const normalize = (value: string) => value.normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+  const worker = async () => {
+    while (cursor < films.length) {
+      const index = cursor++;
+      const film = films[index];
+      if (Date.now() >= deadline) { enriched[index] = FilmData.clone(film); continue; }
+      const matches = await collectPotentialMatches(film.title, film.year, deadline);
+      const exact = matches.filter(match => film.year != null && match.year === film.year
+        && normalize(match.title) === normalize(film.title));
+      enriched[index] = FilmData.clone(film, {
+        potentialMatches: matches,
+        ...(exact.length === 1 ? { tmdbId: exact[0].tmdbId } : {}),
+      });
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(4, films.length) }, worker));
+  return enriched;
+}

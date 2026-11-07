@@ -24,7 +24,7 @@ interface KinopoiskResponse {
  * Fetch info for a single Kinopoisk id.  Errors are swallowed and null is
  * returned so that upstream code can proceed gracefully.
  */
-async function fetchOnce(id: number, token: string): Promise<number | null> {
+async function fetchOnce(id: number, token: string, deadline: number): Promise<number | null> {
   const url = `${BASE_URL}/movie/${id}`;
   try {
     const { data } = await axios.get<KinopoiskResponse>(url, {
@@ -32,7 +32,7 @@ async function fetchOnce(id: number, token: string): Promise<number | null> {
         'X-API-KEY': token,
         Accept: 'application/json',
       },
-      timeout: REQUEST_TIMEOUT,
+      timeout: Math.max(1, Math.min(REQUEST_TIMEOUT, deadline - Date.now())),
     });
 
     // Skip if not a movie
@@ -46,24 +46,23 @@ async function fetchOnce(id: number, token: string): Promise<number | null> {
     // The most common problems are authentication & 404 – both are non-fatal
     // for the enrichment pipeline, so we just log and continue.
     // eslint-disable-next-line no-console
-    console.warn(`[kinopoiskDevService] Request failed for kpId=${id}:`, err);
+    console.warn(`[kinopoiskDevService] Request failed for kpId=${id}`);
     return null;
   }
 }
 
 /**
  * Enriches FilmData with TMDB ids obtained from Kinopoisk when both IMDb &
- * TMDB are missing.  Requires the user-supplied token.
- *
- * Throws Error('KIN_TOKEN_MISSING') when token is empty so that the caller can
- * prompt the user to provide it.
+ * TMDB are missing. An operator-owned token is optional; without it this stage
+ * preserves the input records and lets later stages run.
  */
 export async function attachTmdbIdsViaKinopoisk(
   films: FilmData[],
   token?: string,
+  deadline = Date.now() + 60_000,
 ): Promise<FilmData[]> {
   if (!token) {
-    throw new Error('KIN_TOKEN_MISSING');
+    return films.map(f => FilmData.clone(f));
   }
 
   // Only query ids that have no imdbId & no tmdbId yet.
@@ -71,7 +70,8 @@ export async function attachTmdbIdsViaKinopoisk(
 
   const enrichedMap = new Map<number, number>(); // kpId -> tmdbId
   for (const film of targets) {
-    const mapped = await fetchOnce(film.kinopoiskId, token);
+    if (Date.now() >= deadline) break;
+    const mapped = await fetchOnce(film.kinopoiskId, token, deadline);
     if (mapped != null) {
       enrichedMap.set(film.kinopoiskId, mapped);
       // Small delay (100 ms) to play safe with the free plan rate-limit.
@@ -86,4 +86,4 @@ export async function attachTmdbIdsViaKinopoisk(
     }
     return FilmData.clone(f);
   });
-} 
+}
