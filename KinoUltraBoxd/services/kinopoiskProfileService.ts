@@ -35,6 +35,7 @@ export function parseKinopoiskProfile(input: string): string {
 }
 
 export interface ProfileProgress { collected: number; total: number; pages: number }
+export type ProfileList = 'history' | 'watchlist';
 export interface ProfileImport extends ProfileProgress {
   alias: string;
   films: FilmData[];
@@ -67,7 +68,7 @@ const mobileVariables = {
   includeMovieReleaseDate: false,
 };
 
-function requestBody(alias: string, offset: number, source: ProfileImport['source']): ProfileRequest {
+function requestBody(alias: string, offset: number, source: ProfileImport['source'], list: ProfileList): ProfileRequest {
   if (source === 'android') return {
     operationName: 'FoldersMobileRatedOrWatchedMoviesBySocialAlias', query: MOBILE_QUERY,
     variables: { ...mobileVariables, socialAlias: { socialAlias: alias }, moviesLimit: PAGE_SIZE, moviesOffset: offset },
@@ -75,7 +76,8 @@ function requestBody(alias: string, offset: number, source: ProfileImport['sourc
   return {
     operationName: 'UserReactionMoviesPage', query: WEBSITE_QUERY,
     variables: {
-      isAuthorized: false, socialAlias: alias, includeTypes: ['WATCHED', 'VOTE'], limit: PAGE_SIZE, offset,
+      isAuthorized: false, socialAlias: alias,
+      includeTypes: list === 'watchlist' ? ['PLANNED_TO_WATCH'] : ['WATCHED', 'VOTE'], limit: PAGE_SIZE, offset,
       orderBy: 'UPDATED_AT_DESC', supportedFilterTypes: ['BOOLEAN', 'SINGLE_SELECT'],
       filters: { booleanFilterValues: [], intRangeFilterValues: [], multiSelectFilterValues: [], realRangeFilterValues: [], singleSelectFilterValues: [] },
       singleSelectFiltersLimit: 700, singleSelectFiltersOffset: 0,
@@ -91,7 +93,7 @@ function timestamp(value: unknown): string | null {
   return value;
 }
 
-function parseFilm(item: unknown): FilmData {
+function parseFilm(item: unknown, list: ProfileList): FilmData {
   if (!object(item) || !object(item.movie) || !Array.isArray(item.reactions)) return schemaError();
   const m = item.movie;
   if (!Number.isSafeInteger(m.id) || m.id <= 0 || !object(m.title)) return schemaError();
@@ -104,7 +106,10 @@ function parseFilm(item: unknown): FilmData {
   let hasReaction = false;
   for (const reaction of item.reactions) {
     if (!object(reaction)) return schemaError();
-    if (reaction.__typename === 'Vote') {
+    if (list === 'watchlist') {
+      if (reaction.__typename !== 'PlannedToWatch' || reaction.plannedToWatch !== true) return schemaError();
+      hasReaction = true;
+    } else if (reaction.__typename === 'Vote') {
       if (!Number.isInteger(reaction.value) || reaction.value < 1 || reaction.value > 10) return schemaError();
       rating = reaction.value; ratedAt = timestamp(reaction.votedAt); hasReaction = true;
     } else if (reaction.__typename === 'Watched' && reaction.watched === true) {
@@ -165,13 +170,22 @@ export class KinopoiskProfileClient {
   }
 
   async importProfile(input: string, options: Options = {}): Promise<ProfileImport> {
+    return this.importList(input, 'history', options);
+  }
+
+  async importWatchlist(input: string, options: Options = {}): Promise<ProfileImport> {
+    return this.importList(input, 'watchlist', options);
+  }
+
+  private async importList(input: string, kind: ProfileList, options: Options): Promise<ProfileImport> {
     const alias = parseKinopoiskProfile(input);
     const deadline = this.now() + (options.maxDurationMs ?? 240_000);
     const films = new Map<number, FilmData>();
-    let total: number | undefined, pages = 0, offset = 0, source: ProfileImport['source'] = 'android';
+    let total: number | undefined, pages = 0, offset = 0;
+    let source: ProfileImport['source'] = kind === 'watchlist' ? 'website' : 'android';
     const warnings: string[] = [];
     while (true) {
-      const { data } = await this.fetch(requestBody(alias, offset, source), deadline);
+      const { data } = await this.fetch(requestBody(alias, offset, source, kind), deadline);
       if (!object(data)) return schemaError();
       if (Array.isArray(data.errors) && data.errors.length) {
         const messages = data.errors.map((e: any) => String(e?.message ?? '')).join(' ');
@@ -195,7 +209,7 @@ export class KinopoiskProfileClient {
         throw new ProfileImportError('INCOMPLETE_IMPORT', 'Kinopoisk returned an incomplete page.');
       }
       for (const item of list.items) {
-        const film = parseFilm(item);
+        const film = parseFilm(item, kind);
         if (films.has(film.kinopoiskId)) throw new ProfileImportError('INCOMPLETE_IMPORT', 'Repeated entries detected; please retry.');
         films.set(film.kinopoiskId, film);
       }

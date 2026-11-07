@@ -46,6 +46,7 @@ async function verifyTelegramFlow(directory: string, alias = '1') {
   const original = Telegram.prototype.callApi;
   const documents: { filename: string; bytes: number; sha256: string }[] = [];
   let messages = 0;
+  const transcript: { method: string; text: string }[] = [];
   // The production Telegraf middleware runs unchanged. Its outgoing API transport is replaced.
   Telegram.prototype.callApi = (async (method: string, payload: any) => {
     if (method === 'sendDocument') {
@@ -54,6 +55,7 @@ async function verifyTelegramFlow(directory: string, alias = '1') {
       fs.writeFileSync(path.join(directory, `telegram-${filename}`), source);
       documents.push({ filename, bytes: source.length, sha256: digest(source) });
     }
+    if (payload.text || payload.caption) transcript.push({ method, text: payload.text || payload.caption });
     messages++;
     return { message_id: messages, date: 0, chat: { id: -424242, type: 'private' } };
   }) as any;
@@ -63,11 +65,29 @@ async function verifyTelegramFlow(directory: string, alias = '1') {
       from: { id: -424242, is_bot: false, first_name: 'Local' },
       chat: { id: -424242, type: 'private', first_name: 'Local' },
       text: `https://www.kinopoisk.ru/user/${alias}/` } });
-    assert(documents.some(d => d.filename === 'letterboxd.csv'), 'Telegram flow did not produce a CSV');
+    fs.writeFileSync(path.join(directory, 'telegram-transcript.json'), JSON.stringify(transcript, null, 2));
+    if (!documents.length) {
+      const empty = transcript.some(m => m.text === '✅ Проверены оба списка: они пусты.');
+      const unavailable = alias === '999999999999999' && transcript.some(m => m.text.startsWith('❌ Не удалось загрузить списки.'));
+      assert(empty || unavailable, 'No documents were produced without an expected empty/unavailable outcome');
+      return { input: alias, telegramNetworkRequests: 0, documents, outcome: empty ? 'both empty' : 'profile unavailable' };
+    }
     const backup = JSON.parse(fs.readFileSync(path.join(directory, 'telegram-kinopoisk-backup.json'), 'utf8'));
-    assert.equal(backup.total, backup.entries.length);
+    assert.equal(backup.schemaVersion, 2);
+    const counts: Record<string, unknown> = {};
+    for (const kind of ['history', 'watchlist']) {
+      const list = backup[kind];
+      assert(['ok', 'empty'].includes(list.status), `${kind} failed during live verification`);
+      assert.equal(list.total, list.entries.length);
+      assert.equal(new Set(list.entries.map((f: any) => f.kinopoiskId)).size, list.total);
+      const exportable = list.entries.filter((f: any) => f.type === 'film' && (f.imdbId || f.tmdbId)).length;
+      const filename = `letterboxd-${kind === 'history' ? 'watched' : 'watchlist'}.csv`;
+      assert.equal(documents.some(d => d.filename === filename), exportable > 0, `${kind} CSV presence disagrees with backup`);
+      if (kind === 'watchlist') assert(list.entries.every((f: any) => f.rating === null && f.watchDate === null && f.watchedMarkedAt === null && f.ratedAt === null));
+      counts[kind] = { total: list.total, exported: exportable, series: list.entries.filter((f: any) => f.type === 'series').length };
+    }
     return { input: `https://www.kinopoisk.ru/user/${alias}/`, telegramNetworkRequests: 0,
-      kinopoiskAndMapping: 'real production services', documents, backupEntries: backup.entries.length };
+      kinopoiskAndMapping: 'real production services', documents, lists: counts };
   } finally { Telegram.prototype.callApi = original; }
 }
 

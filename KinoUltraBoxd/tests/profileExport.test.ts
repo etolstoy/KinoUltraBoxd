@@ -12,6 +12,15 @@ it('escapes commas, quotes, carriage returns, and multiline titles', () => {
   const film = new FilmData('A, "B"\r\nC', 2020, 8, null, 'film', 1, 1);
   expect(generateLetterboxdCsv([film]).toString()).toContain('"A, ""B""\r\nC",2020,8,,1,');
 });
+it('exports watchlist identifiers without ratings or watched dates, even for a previously watched film', () => {
+  const films = [new FilmData('A, "B"', 2020, 10, '2021-01-01', 'film', 1, null, 'tt0000001'),
+    new FilmData('Future', null, null, null, 'film', 2, 42),
+    new FilmData('Series', 2020, null, null, 'series', 3, 43),
+    new FilmData('Unknown', 2020, null, null, 'film', 4)];
+  expect(generateLetterboxdCsv(films, 'watchlist').toString()).toBe('Title,Year,tmdbID,imdbID\nFuture,,42,\n"A, ""B""",2020,,tt0000001');
+  expect(buildStatsReport(films, 'watchlist').message).not.toMatch(/оценк|просмотренн/i);
+  expect(buildStatsReport(films, 'watchlist').stats.exportableCount).toBe(2);
+});
 it('CSV and report agree about series and unmatched films', () => {
   const films = [new FilmData('Movie', 2020, 8, null, 'film', 1, 1),
     new FilmData('Series', 2020, 7, null, 'series', 2, 2), new FilmData('Unknown', 2020, null, null, 'film', 3)];
