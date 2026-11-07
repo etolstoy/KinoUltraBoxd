@@ -161,6 +161,7 @@ Source `votedAt` and watched-marker `updatedAt` values are preserved separately 
 
 ### Import reliability and hosting
 
+- The Vercel static output directory is `public/`, containing only `robots.txt`. The bot is served by the `/api/webhook` function; compiled application files in `dist/` are not published as static assets.
 - The importer uses the exact Android 7.107.4 query document extracted on 2026-11-07. Query provenance is recorded in `kinopoiskQueries.ts`. Kinopoisk can change or remove undocumented operations; the website query is used if the Android operation is no longer allowlisted.
 - Pages contain at most 20 records. The importer checks the advertised total, offsets, unique IDs, reaction values, and final page; incomplete or changing libraries fail explicitly. HTTP 429, server failures, and network errors have bounded retries. No partial profile is presented as complete.
 - The Vercel webhook acknowledges Telegram immediately and retains processing with `waitUntil`. Its configured maximum duration is 300 seconds; profile fetching has a 240-second budget and metadata matching ends before the overall 270-second processing budget. Unmatched entries remain in the backup. Profiles that cannot be fetched within the budget report a timeout and need a longer-running worker.
